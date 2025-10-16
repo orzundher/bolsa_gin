@@ -13,21 +13,21 @@ import (
 
 // Transaction representa una transacción de compra de acciones
 type Transaction struct {
-	ID           int
-	Symbol       string
-	Shares       int
+	ID            int
+	Symbol        string
+	Shares        int
 	PurchasePrice float64
 }
 
 // PortfolioItem representa un resumen de una acción en el portafolio
 type PortfolioItem struct {
-	Symbol         string
-	Shares         int
-	PurchasePrice  float64
+	Symbol          string
+	Shares          int
+	PurchasePrice   float64
 	CapitalInvested float64
-	CurrentPrice   float64
-	CurrentValue   float64
-	ProfitLoss     float64
+	CurrentPrice    float64
+	CurrentValue    float64
+	ProfitLoss      float64
 }
 
 var db *sql.DB
