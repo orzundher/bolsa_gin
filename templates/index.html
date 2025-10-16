@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portafolio de Inversiones</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            background: white;
+        }
+
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .symbol {
+            font-weight: 700;
+            color: #667eea;
+            font-size: 1.1em;
+        }
+
+        .positive {
+            color: #28a745;
+            font-weight: 600;
+        }
+
+        .negative {
+            color: #dc3545;
+            font-weight: 600;
+        }
+
+        .total-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        .total-label {
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+
+        .total-value {
+            font-size: 2em;
+            font-weight: 700;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            table {
+                font-size: 0.9em;
+            }
+
+            th, td {
+                padding: 10px 5px;
+            }
+
+            .total-section {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Portafolio de Inversiones</h1>
+        <p class="subtitle">Resumen de transacciones y rendimiento del portafolio</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Símbolo</th>
+                    <th class="text-right">Acciones</th>
+                    <th class="text-right">Precio Compra</th>
+                    <th class="text-right">Capital Invertido</th>
+                    <th class="text-right">Precio Actual</th>
+                    <th class="text-right">Valor Actual</th>
+                    <th class="text-right">Utilidad/Pérdida</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Portfolio}}
+                <tr>
+                    <td class="symbol">{{.Symbol}}</td>
+                    <td class="text-right">{{.Shares}}</td>
+                    <td class="text-right">{{formatMoney .PurchasePrice}}</td>
+                    <td class="text-right">{{formatMoney .CapitalInvested}}</td>
+                    <td class="text-right">{{formatMoney .CurrentPrice}}</td>
+                    <td class="text-right">{{formatMoney .CurrentValue}}</td>
+                    <td class="text-right {{if isPositive .ProfitLoss}}positive{{else}}negative{{end}}">
+                        {{formatMoney .ProfitLoss}}
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+
+        <div class="total-section">
+            <div class="total-label">Capital Total Invertido</div>
+            <div class="total-value">{{formatMoney .TotalCapital}}</div>
+        </div>
+    </div>
+</body>
+</html>
