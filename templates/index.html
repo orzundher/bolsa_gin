@@ -129,6 +129,7 @@
                         <th class="sortable">Acciones</th>
                         <th class="sortable">Precio Venta</th>
                         <th class="sortable">Costo Operación</th>
+                        <th class="sortable">Impuesto Retenido</th>
                         <th class="sortable">Valor Total Venta</th>
                         <th>Acciones</th>
                     </tr>
@@ -141,6 +142,7 @@
                         <td>{{printf "%.2f" .Shares}}</td>
                         <td>{{printf "%.2f€" .SalePrice}}</td>
                         <td>{{printf "%.2f€" .OperationCost}}</td>
+                        <td>{{printf "%.2f€" .WithheldTax}}</td>
                         <td>{{printf "%.2f€" .TotalSaleValue}}</td>
                         <td>
                             <form action="/delete-sale" method="post"
@@ -175,8 +177,7 @@
                                         <tr>
                                             <td><strong>{{$ticker}}</strong></td>
                                             <td>
-                                                <input type="text" name="{{$ticker}}" id="{{$ticker}}" value="{{printf "
-                                                    %.2f" $price}}" class="form-control form-control-sm">
+                                                <input type="text" name="{{$ticker}}" id="{{$ticker}}" value="{{printf "%.2f" $price}}" class="form-control form-control-sm">
                                             </td>
                                         </tr>
                                         {{end}}
@@ -196,7 +197,13 @@
                             <div class="row g-3">
                                 <div class="col-md-4">
                                     <label for="ticker" class="form-label">Ticker</label>
-                                    <input type="text" name="ticker" id="ticker" class="form-control" required>
+                                    <input type="text" name="ticker" id="ticker" class="form-control" list="tickerList"
+                                        required>
+                                    <datalist id="tickerList">
+                                        {{range .UniqueTickers}}
+                                        <option value="{{.}}">
+                                            {{end}}
+                                    </datalist>
                                 </div>
                                 <div class="col-md-4">
                                     <label for="purchase_date" class="form-label">Fecha Compra</label>
@@ -246,14 +253,19 @@
                                     <input type="number" step="any" name="shares" id="sale_shares" class="form-control"
                                         required>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <label for="sale_price" class="form-label">Precio Venta</label>
                                     <input type="number" step="any" name="sale_price" id="sale_price"
                                         class="form-control" required>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <label for="sale_operation_cost" class="form-label">Costo Operación</label>
                                     <input type="number" step="any" name="operation_cost" id="sale_operation_cost"
+                                        class="form-control" placeholder="0.00">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="sale_withheld_tax" class="form-label">Impuesto Retenido</label>
+                                    <input type="number" step="any" name="withheld_tax" id="sale_withheld_tax"
                                         class="form-control" placeholder="0.00">
                                 </div>
                             </div>

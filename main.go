@@ -39,6 +39,7 @@ type Sale struct {
 	Shares        float64
 	SalePrice     float64
 	OperationCost float64
+	WithheldTax   float64
 }
 
 // --- VISTAS ---
@@ -75,6 +76,7 @@ type SaleView struct {
 	Shares         float64
 	SalePrice      float64
 	OperationCost  float64
+	WithheldTax    float64
 	TotalSaleValue float64
 }
 
@@ -194,6 +196,7 @@ func main() {
 		sharesStr := strings.Replace(c.PostForm("shares"), ",", ".", -1)
 		salePriceStr := strings.Replace(c.PostForm("sale_price"), ",", ".", -1)
 		operationCostStr := strings.Replace(c.PostForm("operation_cost"), ",", ".", -1)
+		withheldTaxStr := strings.Replace(c.PostForm("withheld_tax"), ",", ".", -1)
 
 		// Validar y convertir tipos
 		if ticker == "" || saleDateStr == "" {
@@ -218,6 +221,11 @@ func main() {
 			operationCost = 0 // Default to 0 if empty or invalid
 		}
 
+		withheldTax, err := strconv.ParseFloat(withheldTaxStr, 64)
+		if err != nil {
+			withheldTax = 0 // Default to 0 if empty or invalid
+		}
+
 		saleDate, err := time.Parse("2006-01-02", saleDateStr) // El formato de input type=date
 		if err != nil {
 			c.String(http.StatusBadRequest, "Formato de fecha inválido.")
@@ -231,6 +239,7 @@ func main() {
 			Shares:        shares,
 			SalePrice:     salePrice,
 			OperationCost: operationCost,
+			WithheldTax:   withheldTax,
 		}
 		db.Create(&newSale)
 
@@ -455,6 +464,7 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			Shares:         s.Shares,
 			SalePrice:      s.SalePrice,
 			OperationCost:  s.OperationCost,
+			WithheldTax:    s.WithheldTax,
 			TotalSaleValue: totalSaleValue,
 		}
 		saleViews = append(saleViews, view)
