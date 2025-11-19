@@ -331,7 +331,7 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "8081"
 	}
 	log.Printf("Servidor iniciado en http://localhost:%s", port)
 	router.Run(":" + port)

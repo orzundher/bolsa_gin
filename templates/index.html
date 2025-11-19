@@ -1,6 +1,6 @@
-
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -32,15 +32,19 @@
             /* Verde de Bootstrap */
             font-weight: bold;
         }
+
         .loss {
-            color: #dc3545; /* Rojo de Bootstrap */
+            color: #dc3545;
+            /* Rojo de Bootstrap */
             font-weight: bold;
         }
+
         /* Estilos para la tabla ordenable */
         .table thead th.sortable {
             cursor: pointer;
             position: relative;
         }
+
         .table thead th.sortable::after,
         .table thead th.sortable::before {
             position: absolute;
@@ -48,20 +52,26 @@
             font-size: 0.8em;
             opacity: 0.4;
         }
+
         .table thead th.sortable::before {
-            content: "\25B2"; /* Flecha arriba */
+            content: "\25B2";
+            /* Flecha arriba */
             top: 0.5em;
         }
+
         .table thead th.sortable::after {
-            content: "\25BC"; /* Flecha abajo */
+            content: "\25BC";
+            /* Flecha abajo */
             bottom: 0.5em;
         }
+
         .table thead th.sort-asc::before,
         .table thead th.sort-desc::after {
             opacity: 1;
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1 class="mb-4">Portafolio de Inversiones</h1>
@@ -74,7 +84,8 @@
                 </div>
                 <div class="col-md-6">
                     <h4>Utilidad Neta Actual</h4>
-                    <h3 class="{{if gt .NetProfitLoss 0.0}}profit{{else}}loss{{end}}">{{printf "%.2f€" .NetProfitLoss}}</h3>
+                    <h3 class="{{if gt .NetProfitLoss 0.0}}profit{{else}}loss{{end}}">{{printf "%.2f€" .NetProfitLoss}}
+                    </h3>
                 </div>
             </div>
         </div>
@@ -100,7 +111,8 @@
                         <td>{{printf "%.2f€" .InvestedCapital}}</td>
                         <td>{{printf "%.2f€" .TotalCost}}</td>
                         <td>{{printf "%.2f€" .CurrentValue}}</td>
-                        <td class="{{if gt .ProfitLoss 0.0}}profit{{else}}loss{{end}}">{{printf "%.2f€" .ProfitLoss}}</td>
+                        <td class="{{if gt .ProfitLoss 0.0}}profit{{else}}loss{{end}}">{{printf "%.2f€" .ProfitLoss}}
+                        </td>
                     </tr>
                     {{end}}
                 </tbody>
@@ -131,7 +143,9 @@
                         <td>{{printf "%.2f€" .OperationCost}}</td>
                         <td>{{printf "%.2f€" .TotalSaleValue}}</td>
                         <td>
-                            <form action="/delete-sale" method="post" onsubmit="return confirm('¿Estás seguro de que quieres eliminar esta venta?');" style="display: inline;">
+                            <form action="/delete-sale" method="post"
+                                onsubmit="return confirm('¿Estás seguro de que quieres eliminar esta venta?');"
+                                style="display: inline;">
                                 <input type="hidden" name="id" value="{{.ID}}">
                                 <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
                             </form>
@@ -161,7 +175,8 @@
                                         <tr>
                                             <td><strong>{{$ticker}}</strong></td>
                                             <td>
-                                                <input type="text" name="{{$ticker}}" id="{{$ticker}}" value="{{printf "%.2f" $price}}" class="form-control form-control-sm">
+                                                <input type="text" name="{{$ticker}}" id="{{$ticker}}" value="{{printf "
+                                                    %.2f" $price}}" class="form-control form-control-sm">
                                             </td>
                                         </tr>
                                         {{end}}
@@ -185,19 +200,23 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label for="purchase_date" class="form-label">Fecha Compra</label>
-                                    <input type="date" name="purchase_date" id="purchase_date" class="form-control" required>
+                                    <input type="date" name="purchase_date" id="purchase_date" class="form-control"
+                                        required>
                                 </div>
                                 <div class="col-md-4">
                                     <label for="shares" class="form-label">Acciones</label>
-                                    <input type="number" step="any" name="shares" id="shares" class="form-control" required>
+                                    <input type="number" step="any" name="shares" id="shares" class="form-control"
+                                        required>
                                 </div>
                                 <div class="col-md-6">
                                     <label for="purchase_price" class="form-label">Precio Compra</label>
-                                    <input type="number" step="any" name="purchase_price" id="purchase_price" class="form-control" required>
+                                    <input type="number" step="any" name="purchase_price" id="purchase_price"
+                                        class="form-control" required>
                                 </div>
                                 <div class="col-md-6">
                                     <label for="operation_cost" class="form-label">Costo Operación</label>
-                                    <input type="number" step="any" name="operation_cost" id="operation_cost" class="form-control" placeholder="0.00">
+                                    <input type="number" step="any" name="operation_cost" id="operation_cost"
+                                        class="form-control" placeholder="0.00">
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-success mt-3">Registrar</button>
@@ -214,7 +233,7 @@
                                     <select name="ticker" id="sale_ticker" class="form-select" required>
                                         <option value="">Seleccionar Ticker</option>
                                         {{range .UniqueTickers}}
-                                            <option value="{{.}}">{{.}}</option>
+                                        <option value="{{.}}">{{.}}</option>
                                         {{end}}
                                     </select>
                                 </div>
@@ -224,15 +243,18 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label for="sale_shares" class="form-label">Acciones</label>
-                                    <input type="number" step="any" name="shares" id="sale_shares" class="form-control" required>
+                                    <input type="number" step="any" name="shares" id="sale_shares" class="form-control"
+                                        required>
                                 </div>
                                 <div class="col-md-6">
                                     <label for="sale_price" class="form-label">Precio Venta</label>
-                                    <input type="number" step="any" name="sale_price" id="sale_price" class="form-control" required>
+                                    <input type="number" step="any" name="sale_price" id="sale_price"
+                                        class="form-control" required>
                                 </div>
                                 <div class="col-md-6">
                                     <label for="sale_operation_cost" class="form-label">Costo Operación</label>
-                                    <input type="number" step="any" name="operation_cost" id="sale_operation_cost" class="form-control" placeholder="0.00">
+                                    <input type="number" step="any" name="operation_cost" id="sale_operation_cost"
+                                        class="form-control" placeholder="0.00">
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-success mt-3">Registrar Venta</button>
@@ -274,7 +296,9 @@
                         </td>
                         <td>
                             <a href="/edit/{{.ID}}" class="btn btn-warning btn-sm">Editar</a>
-                            <form action="/delete-investment" method="post" onsubmit="return confirm('¿Estás seguro de que quieres eliminar esta compra?');" style="display: inline;">
+                            <form action="/delete-investment" method="post"
+                                onsubmit="return confirm('¿Estás seguro de que quieres eliminar esta compra?');"
+                                style="display: inline;">
                                 <input type="hidden" name="id" value="{{.ID}}">
                                 <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
                             </form>
@@ -287,91 +311,92 @@
 
     </div>
 
-<script>
-/**
- * Script para hacer una tabla HTML ordenable.
- */
-document.addEventListener('DOMContentLoaded', function() {
-    const getCellValue = (tr, idx) => {
-        const td = tr.children[idx];
-        if (td) {
-            // Para la primera columna, mira dentro de la etiqueta <strong>
-            const child = td.querySelector('strong');
-            return child ? child.innerText : td.innerText;
-        }
-        return '';
-    };
+    <script>
+        /**
+         * Script para hacer una tabla HTML ordenable.
+         */
+        document.addEventListener('DOMContentLoaded', function () {
+            const getCellValue = (tr, idx) => {
+                const td = tr.children[idx];
+                if (td) {
+                    // Para la primera columna, mira dentro de la etiqueta <strong>
+                    const child = td.querySelector('strong');
+                    return child ? child.innerText : td.innerText;
+                }
+                return '';
+            };
 
-    const parseValue = (value) => {
-        // Intenta convertir a fecha (formato DD MMM YYYY)
-        const dateMatch = value.match(/^(\d{2}) (\w{3}) (\d{4})$/);
-        if (dateMatch) {
-            const day = parseInt(dateMatch[1], 10);
-            const monthStr = dateMatch[2];
-            const year = parseInt(dateMatch[3], 10);
-            const monthMap = { 'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5, 'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11 };
-            if (monthStr in monthMap) {
-                return new Date(year, monthMap[monthStr], day);
-            }
-        }
+            const parseValue = (value) => {
+                // Intenta convertir a fecha (formato DD MMM YYYY)
+                const dateMatch = value.match(/^(\d{2}) (\w{3}) (\d{4})$/);
+                if (dateMatch) {
+                    const day = parseInt(dateMatch[1], 10);
+                    const monthStr = dateMatch[2];
+                    const year = parseInt(dateMatch[3], 10);
+                    const monthMap = { 'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5, 'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11 };
+                    if (monthStr in monthMap) {
+                        return new Date(year, monthMap[monthStr], day);
+                    }
+                }
 
-        // Intenta convertir a número (limpiando símbolos y usando punto como decimal)
-        const numValue = parseFloat(value.replace(/€/g, '').replace(/,/g, '.'));
-        if (!isNaN(numValue)) {
-            return numValue;
-        }
+                // Intenta convertir a número (limpiando símbolos y usando punto como decimal)
+                const numValue = parseFloat(value.replace(/€/g, '').replace(/,/g, '.'));
+                if (!isNaN(numValue)) {
+                    return numValue;
+                }
 
-        // Devuelve como texto si no es ni fecha ni número
-        return value;
-    };
+                // Devuelve como texto si no es ni fecha ni número
+                return value;
+            };
 
-    const comparer = (idx, asc) => (a, b) => ((v1, v2) => 
-        v1 !== '' && v2 !== '' && !isNaN(v1) && !isNaN(v2) 
-            ? v1 - v2 
-            : v1.toString().localeCompare(v2.toString())
-    )(parseValue(getCellValue(asc ? a : b, idx)), parseValue(getCellValue(asc ? b : a, idx)));
+            const comparer = (idx, asc) => (a, b) => ((v1, v2) =>
+                v1 !== '' && v2 !== '' && !isNaN(v1) && !isNaN(v2)
+                    ? v1 - v2
+                    : v1.toString().localeCompare(v2.toString())
+            )(parseValue(getCellValue(asc ? a : b, idx)), parseValue(getCellValue(asc ? b : a, idx)));
 
-    document.querySelectorAll('.sortable').forEach(th => {
-        th.addEventListener('click', (() => {
-            const table = th.closest('table');
-            const tbody = table.querySelector('tbody');
-            const thIndex = Array.from(th.parentNode.children).indexOf(th);
-            const currentIsAsc = th.classList.contains('sort-asc');
+            document.querySelectorAll('.sortable').forEach(th => {
+                th.addEventListener('click', (() => {
+                    const table = th.closest('table');
+                    const tbody = table.querySelector('tbody');
+                    const thIndex = Array.from(th.parentNode.children).indexOf(th);
+                    const currentIsAsc = th.classList.contains('sort-asc');
 
-            document.querySelectorAll('.sortable').forEach(h => {
-                h.classList.remove('sort-asc', 'sort-desc');
+                    document.querySelectorAll('.sortable').forEach(h => {
+                        h.classList.remove('sort-asc', 'sort-desc');
+                    });
+
+                    th.classList.toggle('sort-asc', !currentIsAsc);
+                    th.classList.toggle('sort-desc', currentIsAsc);
+
+                    Array.from(tbody.querySelectorAll('tr'))
+                        .sort(comparer(thIndex, !currentIsAsc))
+                        .forEach(tr => tbody.appendChild(tr));
+                }));
             });
 
-            th.classList.toggle('sort-asc', !currentIsAsc);
-            th.classList.toggle('sort-desc', currentIsAsc);
+            // Default sort for summaryTable by 'Utilidad (+/-)' (index 5) in descending order
+            const summaryTable = document.getElementById('summaryTable');
+            if (summaryTable) {
+                const utilityHeader = summaryTable.querySelector('thead th:nth-child(6)'); // 'Utilidad (+/-)' is the 6th th
+                if (utilityHeader) {
+                    utilityHeader.click(); // Sort ascending
+                    utilityHeader.click(); // Sort descending
+                }
+            }
 
-            Array.from(tbody.querySelectorAll('tr'))
-                .sort(comparer(thIndex, !currentIsAsc))
-                .forEach(tr => tbody.appendChild(tr));
-        }));
-    });
-
-    // Default sort for summaryTable by 'Utilidad (+/-)' (index 5) in descending order
-    const summaryTable = document.getElementById('summaryTable');
-    if (summaryTable) {
-        const utilityHeader = summaryTable.querySelector('thead th:nth-child(6)'); // 'Utilidad (+/-)' is the 6th th
-        if (utilityHeader) {
-            utilityHeader.click(); // Sort ascending
-            utilityHeader.click(); // Sort descending
-        }
-    }
-
-    // Default sort for salesTable by 'Fecha Venta' (index 1) in descending order
-    const salesTable = document.getElementById('salesTable');
-    if (salesTable) {
-        const saleDateHeader = salesTable.querySelector('thead th:nth-child(2)'); // 'Fecha Venta' is the 2nd th
-        if (saleDateHeader) {
-            saleDateHeader.click(); // Sort ascending
-            saleDateHeader.click(); // Sort descending
-        }
-    }
-});
-</script>
+            // Default sort for salesTable by 'Fecha Venta' (index 1) in descending order
+            const salesTable = document.getElementById('salesTable');
+            if (salesTable) {
+                const saleDateHeader = salesTable.querySelector('thead th:nth-child(2)'); // 'Fecha Venta' is the 2nd th
+                if (saleDateHeader) {
+                    saleDateHeader.click(); // Sort ascending
+                    saleDateHeader.click(); // Sort descending
+                }
+            }
+        });
+    </script>
 
 </body>
+
 </html>
