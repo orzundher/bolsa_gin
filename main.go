@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -28,6 +29,16 @@ type Investment struct {
 type MarketData struct {
 	Ticker       string `gorm:"primaryKey"`
 	CurrentPrice float64
+}
+
+// Sale representa una única venta de acciones en la BD.
+type Sale struct {
+	gorm.Model
+	Ticker        string
+	SaleDate      time.Time
+	Shares        float64
+	SalePrice     float64
+	OperationCost float64
 }
 
 // --- VISTAS ---
@@ -56,6 +67,17 @@ type TickerSummaryView struct {
 	ProfitLoss      float64
 }
 
+// SaleView representa los datos de venta que se mostrarán en la página.
+type SaleView struct {
+	ID             uint
+	Ticker         string
+	SaleDate       string
+	Shares         float64
+	SalePrice      float64
+	OperationCost  float64
+	TotalSaleValue float64
+}
+
 var db *gorm.DB
 
 func main() {
@@ -72,7 +94,7 @@ func main() {
 
 	// Ruta principal para mostrar los datos
 	router.GET("/", func(c *gin.Context) {
-		investments, summaries, totalCapital, netProfitLoss, currentPrices, err := getInvestmentData()
+		investments, summaries, sales, totalCapital, netProfitLoss, currentPrices, uniqueTickers, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
@@ -81,10 +103,13 @@ func main() {
 		c.HTML(http.StatusOK, "index.html", gin.H{
 			"Investments":   investments,
 			"Summaries":     summaries,
+			"Sales":         sales,
 			"TotalCapital":  totalCapital,
 			"NetProfitLoss": netProfitLoss,
 			"CurrentPrices": currentPrices,
+			"UniqueTickers": uniqueTickers,
 		})
+		log.Printf("Unique Tickers passed to template: %v", uniqueTickers)
 	})
 
 	// Ruta para actualizar los precios
@@ -158,6 +183,73 @@ func main() {
 		db.FirstOrCreate(&MarketData{Ticker: ticker}, &MarketData{Ticker: ticker, CurrentPrice: purchasePrice})
 
 		log.Printf("Nueva compra registrada para %s", ticker)
+		c.Redirect(http.StatusFound, "/")
+	})
+
+	// Ruta para registrar una nueva venta
+	router.POST("/add-sale", func(c *gin.Context) {
+		// Parsear valores del formulario
+		ticker := strings.ToUpper(c.PostForm("ticker"))
+		saleDateStr := c.PostForm("sale_date")
+		sharesStr := strings.Replace(c.PostForm("shares"), ",", ".", -1)
+		salePriceStr := strings.Replace(c.PostForm("sale_price"), ",", ".", -1)
+		operationCostStr := strings.Replace(c.PostForm("operation_cost"), ",", ".", -1)
+
+		// Validar y convertir tipos
+		if ticker == "" || saleDateStr == "" {
+			c.String(http.StatusBadRequest, "Ticker y fecha de venta son obligatorios.")
+			return
+		}
+
+		shares, err := strconv.ParseFloat(sharesStr, 64)
+		if err != nil || shares <= 0 {
+			c.String(http.StatusBadRequest, "La cantidad de acciones debe ser un número positivo.")
+			return
+		}
+
+		salePrice, err := strconv.ParseFloat(salePriceStr, 64)
+		if err != nil || salePrice <= 0 {
+			c.String(http.StatusBadRequest, "El precio de venta debe ser un número positivo.")
+			return
+		}
+
+		operationCost, err := strconv.ParseFloat(operationCostStr, 64)
+		if err != nil {
+			operationCost = 0 // Default to 0 if empty or invalid
+		}
+
+		saleDate, err := time.Parse("2006-01-02", saleDateStr) // El formato de input type=date
+		if err != nil {
+			c.String(http.StatusBadRequest, "Formato de fecha inválido.")
+			return
+		}
+
+		// Crear la nueva venta
+		newSale := Sale{
+			Ticker:        ticker,
+			SaleDate:      saleDate,
+			Shares:        shares,
+			SalePrice:     salePrice,
+			OperationCost: operationCost,
+		}
+		db.Create(&newSale)
+
+		log.Printf("Nueva venta registrada para %s", ticker)
+		c.Redirect(http.StatusFound, "/")
+	})
+
+	// Ruta para eliminar una venta
+	router.POST("/delete-sale", func(c *gin.Context) {
+		idStr := c.PostForm("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.String(http.StatusBadRequest, "ID inválido.")
+			return
+		}
+
+		db.Delete(&Sale{}, id)
+
+		log.Printf("Registro de venta con ID %d marcado como eliminado", id)
 		c.Redirect(http.StatusFound, "/")
 	})
 
@@ -237,8 +329,12 @@ func main() {
 		c.Redirect(http.StatusFound, "/")
 	})
 
-	log.Println("Servidor iniciado en http://localhost:8080")
-	router.Run(":8080")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Printf("Servidor iniciado en http://localhost:%s", port)
+	router.Run(":" + port)
 }
 
 func setupDatabase() (*gorm.DB, error) {
@@ -249,7 +345,7 @@ func setupDatabase() (*gorm.DB, error) {
 
 	// AutoMigrate creará las tablas basadas en los structs de Go
 	log.Println("Migrando base de datos...")
-	database.AutoMigrate(&Investment{}, &MarketData{})
+	database.AutoMigrate(&Investment{}, &MarketData{}, &Sale{})
 
 	// Insertar datos de ejemplo si la tabla está vacía
 	var count int64
@@ -270,14 +366,14 @@ func setupDatabase() (*gorm.DB, error) {
 			{Ticker: "MSFT", CurrentPrice: 340.80},
 		}
 		for _, md := range marketData {
-            database.Save(&md) // Usamos Save para crear o actualizar
-        }
+			database.Save(&md) // Usamos Save para crear o actualizar
+		}
 	}
 
 	return database, nil
 }
 
-func getInvestmentData() ([]InvestmentView, []TickerSummaryView, float64, float64, map[string]float64, error) {
+func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, float64, float64, map[string]float64, []string, error) {
 	// 1. Obtener todos los precios de mercado de la BD
 	var marketDataItems []MarketData
 	db.Find(&marketDataItems)
@@ -291,10 +387,13 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, float64, float6
 	var investments []Investment
 	db.Order("purchase_date desc").Find(&investments)
 
-	// 3. Construir la vista detallada y calcular totales
+	// 3. Construir la vista detallada de inversiones y calcular totales
 	var investmentViews []InvestmentView
 	var totalCapital float64
 	var netProfitLoss float64
+
+	// Para almacenar tickers únicos
+	uniqueTickersMap := make(map[string]bool)
 
 	for _, i := range investments {
 		currentPrice := currentPrices[i.Ticker]
@@ -318,6 +417,7 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, float64, float6
 		totalCapital += investedCapital + i.OperationCost // El capital total sí debe incluir los costos
 		netProfitLoss += profitLoss
 		investmentViews = append(investmentViews, view)
+		uniqueTickersMap[i.Ticker] = true
 	}
 
 	// 4. Construir la vista de resumen por ticker
@@ -341,5 +441,30 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, float64, float6
 		summaryViews = append(summaryViews, *summary)
 	}
 
-	return investmentViews, summaryViews, totalCapital, netProfitLoss, currentPrices, nil
+	// 5. Obtener todas las ventas de la BD y construir la vista detallada
+	var sales []Sale
+	db.Order("sale_date desc").Find(&sales)
+
+	var saleViews []SaleView
+	for _, s := range sales {
+		totalSaleValue := s.Shares * s.SalePrice
+		view := SaleView{
+			ID:             s.ID,
+			Ticker:         s.Ticker,
+			SaleDate:       s.SaleDate.Format("02 Jan 2006"),
+			Shares:         s.Shares,
+			SalePrice:      s.SalePrice,
+			OperationCost:  s.OperationCost,
+			TotalSaleValue: totalSaleValue,
+		}
+		saleViews = append(saleViews, view)
+	}
+
+	// Convertir el mapa de tickers únicos a un slice
+	var uniqueTickers []string
+	for ticker := range uniqueTickersMap {
+		uniqueTickers = append(uniqueTickers, ticker)
+	}
+
+	return investmentViews, summaryViews, saleViews, totalCapital, netProfitLoss, currentPrices, uniqueTickers, nil
 }
