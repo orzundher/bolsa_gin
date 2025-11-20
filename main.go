@@ -114,6 +114,20 @@ func main() {
 		log.Printf("Unique Tickers passed to template: %v", uniqueTickers)
 	})
 
+	// Ruta para mostrar la página de compras
+	router.GET("/compras", func(c *gin.Context) {
+		investments, _, _, _, _, _, uniqueTickers, err := getInvestmentData()
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
+			return
+		}
+
+		c.HTML(http.StatusOK, "compras.html", gin.H{
+			"Investments":   investments,
+			"UniqueTickers": uniqueTickers,
+		})
+	})
+
 	// Ruta para actualizar los precios
 	router.POST("/update-prices", func(c *gin.Context) {
 		err := c.Request.ParseForm()
@@ -141,6 +155,10 @@ func main() {
 		sharesStr := strings.Replace(c.PostForm("shares"), ",", ".", -1)
 		purchasePriceStr := strings.Replace(c.PostForm("purchase_price"), ",", ".", -1)
 		operationCostStr := strings.Replace(c.PostForm("operation_cost"), ",", ".", -1)
+		redirectTo := c.PostForm("redirect_to")
+		if redirectTo == "" {
+			redirectTo = "/"
+		}
 
 		// Validar y convertir tipos
 		if ticker == "" || purchaseDateStr == "" {
@@ -185,7 +203,7 @@ func main() {
 		db.FirstOrCreate(&MarketData{Ticker: ticker}, &MarketData{Ticker: ticker, CurrentPrice: purchasePrice})
 
 		log.Printf("Nueva compra registrada para %s", ticker)
-		c.Redirect(http.StatusFound, "/")
+		c.Redirect(http.StatusFound, redirectTo)
 	})
 
 	// Ruta para registrar una nueva venta
@@ -325,6 +343,11 @@ func main() {
 	// Ruta para eliminar una compra
 	router.POST("/delete-investment", func(c *gin.Context) {
 		idStr := c.PostForm("id")
+		redirectTo := c.PostForm("redirect_to")
+		if redirectTo == "" {
+			redirectTo = "/"
+		}
+
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
 			c.String(http.StatusBadRequest, "ID inválido.")
@@ -335,7 +358,7 @@ func main() {
 		db.Delete(&Investment{}, id)
 
 		log.Printf("Registro de compra con ID %d marcado como eliminado", id)
-		c.Redirect(http.StatusFound, "/")
+		c.Redirect(http.StatusFound, redirectTo)
 	})
 
 	port := os.Getenv("PORT")

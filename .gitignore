@@ -17,10 +17,7 @@ go.work
 # Binary
 bolsa_gin
 
-# Database
-*.db
-
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
