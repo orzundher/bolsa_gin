@@ -96,7 +96,7 @@ func main() {
 
 	// Ruta principal para mostrar los datos
 	router.GET("/", func(c *gin.Context) {
-		investments, summaries, sales, totalCapital, netProfitLoss, currentPrices, uniqueTickers, err := getInvestmentData()
+		investments, summaries, _, totalCapital, netProfitLoss, _, uniqueTickers, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
@@ -105,11 +105,10 @@ func main() {
 		c.HTML(http.StatusOK, "index.html", gin.H{
 			"Investments":   investments,
 			"Summaries":     summaries,
-			"Sales":         sales,
 			"TotalCapital":  totalCapital,
 			"NetProfitLoss": netProfitLoss,
-			"CurrentPrices": currentPrices,
 			"UniqueTickers": uniqueTickers,
+			"ActivePage":    "home",
 		})
 		log.Printf("Unique Tickers passed to template: %v", uniqueTickers)
 	})
@@ -125,6 +124,36 @@ func main() {
 		c.HTML(http.StatusOK, "compras.html", gin.H{
 			"Investments":   investments,
 			"UniqueTickers": uniqueTickers,
+			"ActivePage":    "compras",
+		})
+	})
+
+	// Ruta para mostrar la página de ventas
+	router.GET("/ventas", func(c *gin.Context) {
+		_, _, sales, _, _, _, uniqueTickers, err := getInvestmentData()
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
+			return
+		}
+
+		c.HTML(http.StatusOK, "ventas.html", gin.H{
+			"Sales":         sales,
+			"UniqueTickers": uniqueTickers,
+			"ActivePage":    "ventas",
+		})
+	})
+
+	// Ruta para mostrar la página de precios
+	router.GET("/precios", func(c *gin.Context) {
+		_, _, _, _, _, currentPrices, _, err := getInvestmentData()
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
+			return
+		}
+
+		c.HTML(http.StatusOK, "precios.html", gin.H{
+			"CurrentPrices": currentPrices,
+			"ActivePage":    "precios",
 		})
 	})
 
@@ -136,7 +165,16 @@ func main() {
 			return
 		}
 
+		redirectTo := c.PostForm("redirect_to")
+		if redirectTo == "" {
+			redirectTo = "/"
+		}
+
 		for ticker, newPriceStr := range c.Request.PostForm {
+			// Ignorar el campo redirect_to
+			if ticker == "redirect_to" {
+				continue
+			}
 			// Reemplazar coma por punto para asegurar el parseo correcto
 			priceStrWithDot := strings.Replace(newPriceStr[0], ",", ".", -1)
 			if newPrice, err := strconv.ParseFloat(priceStrWithDot, 64); err == nil {
@@ -144,7 +182,7 @@ func main() {
 				db.Save(&MarketData{Ticker: ticker, CurrentPrice: newPrice})
 			}
 		}
-		c.Redirect(http.StatusFound, "/")
+		c.Redirect(http.StatusFound, redirectTo)
 	})
 
 	// Ruta para registrar una nueva compra
@@ -215,6 +253,10 @@ func main() {
 		salePriceStr := strings.Replace(c.PostForm("sale_price"), ",", ".", -1)
 		operationCostStr := strings.Replace(c.PostForm("operation_cost"), ",", ".", -1)
 		withheldTaxStr := strings.Replace(c.PostForm("withheld_tax"), ",", ".", -1)
+		redirectTo := c.PostForm("redirect_to")
+		if redirectTo == "" {
+			redirectTo = "/"
+		}
 
 		// Validar y convertir tipos
 		if ticker == "" || saleDateStr == "" {
@@ -262,12 +304,17 @@ func main() {
 		db.Create(&newSale)
 
 		log.Printf("Nueva venta registrada para %s", ticker)
-		c.Redirect(http.StatusFound, "/")
+		c.Redirect(http.StatusFound, redirectTo)
 	})
 
 	// Ruta para eliminar una venta
 	router.POST("/delete-sale", func(c *gin.Context) {
 		idStr := c.PostForm("id")
+		redirectTo := c.PostForm("redirect_to")
+		if redirectTo == "" {
+			redirectTo = "/"
+		}
+
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
 			c.String(http.StatusBadRequest, "ID inválido.")
@@ -277,7 +324,7 @@ func main() {
 		db.Delete(&Sale{}, id)
 
 		log.Printf("Registro de venta con ID %d marcado como eliminado", id)
-		c.Redirect(http.StatusFound, "/")
+		c.Redirect(http.StatusFound, redirectTo)
 	})
 
 	// Ruta para mostrar el formulario de edición
