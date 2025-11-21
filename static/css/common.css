@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 /* Common styles shared across all pages */
 
 /* Hide scrollbar while maintaining functionality */
@@ -16,7 +18,11 @@ html {
 }
 
 /* Typography */
-body,
+body {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+}
+
 .form-control,
 .form-label,
 .btn,
