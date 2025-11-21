@@ -1,0 +1,72 @@
+/* Common styles shared across all pages */
+
+/* Hide scrollbar while maintaining functionality */
+::-webkit-scrollbar {
+    display: none;
+}
+
+html {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+.container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+/* Typography */
+body,
+.form-control,
+.form-label,
+.btn,
+.table {
+    font-size: 0.85rem;
+}
+
+h1,
+h3,
+h4,
+h5 {
+    font-size: 1.5rem;
+}
+
+/* Financial indicators */
+.profit {
+    color: #198754;
+    font-weight: bold;
+}
+
+.loss {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+/* Sortable table styling */
+.table thead th.sortable {
+    cursor: pointer;
+    position: relative;
+}
+
+.table thead th.sortable::after,
+.table thead th.sortable::before {
+    position: absolute;
+    right: 0.5em;
+    font-size: 0.8em;
+    opacity: 0.4;
+}
+
+.table thead th.sortable::before {
+    content: "\25B2";
+    top: 0.5em;
+}
+
+.table thead th.sortable::after {
+    content: "\25BC";
+    bottom: 0.5em;
+}
+
+.table thead th.sort-asc::before,
+.table thead th.sort-desc::after {
+    opacity: 1;
+}

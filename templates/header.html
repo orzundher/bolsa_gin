@@ -1,0 +1,33 @@
+{{define "header"}}
+<header>
+    <div class="bg-primary text-white" style="padding: 0.1rem 0;">
+        <div class="container" style="padding: 0;">
+            <h1 class="mb-0" style="font-size: 1.25rem; line-height: 1; margin: 0; padding: 0;">Portafolio de Inversiones</h1>
+        </div>
+    </div>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light" style="padding: 0.1rem 0; min-height: auto;">
+        <div class="container" style="padding: 0;">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link {{if eq .ActivePage "home"}}active{{end}}" href="/">Inicio</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{if eq .ActivePage "compras"}}active{{end}}" href="/compras">Compras</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{if eq .ActivePage "ventas"}}active{{end}}" href="/ventas">Ventas</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{if eq .ActivePage "precios"}}active{{end}}" href="/precios">Precios</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+</header>
+{{end}}
