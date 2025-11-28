@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -9,7 +10,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/driver/sqlite"
+	"github.com/joho/godotenv"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -83,6 +85,11 @@ type SaleView struct {
 var db *gorm.DB
 
 func main() {
+	// Cargar variables de entorno desde .env
+	if err := godotenv.Load(); err != nil {
+		log.Println("No se encontró archivo .env, usando variables de entorno del sistema")
+	}
+
 	var err error
 	// Configurar la base de datos con GORM
 	db, err = setupDatabase()
@@ -93,6 +100,7 @@ func main() {
 	// Configurar Gin
 	router := gin.Default()
 	router.LoadHTMLGlob("templates/*")
+	router.Static("/static", "./static")
 
 	// Ruta principal para mostrar los datos
 	router.GET("/", func(c *gin.Context) {
@@ -417,7 +425,13 @@ func main() {
 }
 
 func setupDatabase() (*gorm.DB, error) {
-	database, err := gorm.Open(sqlite.Open("investments.db"), &gorm.Config{})
+	// Usar connection string directo de Supabase
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		return nil, fmt.Errorf("falta la variable de entorno DATABASE_URL")
+	}
+
+	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}

@@ -23,3 +23,6 @@ bolsa_gin
 *.swp
 *.swo
 *~
+
+# Environment variables
+.env

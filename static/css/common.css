@@ -7,9 +7,14 @@
     display: none;
 }
 
-html {
+html, body {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
+}
+
+* {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
 
 .container {
@@ -35,6 +40,22 @@ h3,
 h4,
 h5 {
     font-size: 1.5rem;
+}
+
+/* Navigation active page indicator */
+.nav-link.active-page {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    font-weight: 600;
+    color: #fff !important;
+}
+
+.navbar-dark .nav-link {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.navbar-dark .nav-link:hover {
+    color: #fff;
 }
 
 /* Financial indicators */
