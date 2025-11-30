@@ -26,11 +26,11 @@
                             <input type="hidden" name="redirect_to" value="/ventas">
                             <div class="row g-3">
                                 <div class="col-md-4">
-                                    <label for="sale_ticker" class="form-label">Ticker</label>
-                                    <select name="ticker" id="sale_ticker" class="form-select" required>
+                                    <label for="sale_ticker_id" class="form-label">Ticker</label>
+                                    <select name="ticker_id" id="sale_ticker_id" class="form-select" required>
                                         <option value="">Seleccionar Ticker</option>
-                                        {{range .UniqueTickers}}
-                                        <option value="{{.}}">{{.}}</option>
+                                        {{range .Tickers}}
+                                        <option value="{{.ID}}">{{.Name}}</option>
                                         {{end}}
                                     </select>
                                 </div>

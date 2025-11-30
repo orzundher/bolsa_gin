@@ -22,8 +22,35 @@
                         <a class="nav-link {{if eq .ActivePage "precios"}}active-page{{end}}" href="/precios">Precios</a>
                     </li>
                 </ul>
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item d-flex align-items-center">
+                        <span class="text-light me-2" style="font-size: 0.85rem;">Dark Mode</span>
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="darkModeToggle" onchange="toggleDarkMode()" style="cursor: pointer;">
+                        </div>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
 </header>
+<script>
+    function toggleDarkMode() {
+        const body = document.body;
+        const toggle = document.getElementById('darkModeToggle');
+        const isDark = toggle.checked;
+        body.classList.toggle('dark-mode', isDark);
+        localStorage.setItem('darkMode', isDark ? 'enabled' : 'disabled');
+    }
+
+    // Aplicar preferencia guardada al cargar
+    (function() {
+        const savedMode = localStorage.getItem('darkMode');
+        const toggle = document.getElementById('darkModeToggle');
+        if (savedMode === 'enabled') {
+            document.body.classList.add('dark-mode');
+            if (toggle) toggle.checked = true;
+        }
+    })();
+</script>
 {{end}}

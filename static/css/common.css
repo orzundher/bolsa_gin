@@ -73,27 +73,151 @@ h5 {
 .table thead th.sortable {
     cursor: pointer;
     position: relative;
-}
-
-.table thead th.sortable::after,
-.table thead th.sortable::before {
-    position: absolute;
-    right: 0.5em;
-    font-size: 0.8em;
-    opacity: 0.4;
-}
-
-.table thead th.sortable::before {
-    content: "\25B2";
-    top: 0.5em;
+    padding-right: 1.5em;
 }
 
 .table thead th.sortable::after {
-    content: "\25BC";
-    bottom: 0.5em;
+    position: absolute;
+    right: 0.5em;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7em;
+    opacity: 0.4;
+    content: "\25B2\25BC";
 }
 
-.table thead th.sort-asc::before,
-.table thead th.sort-desc::after {
+.table thead th.sortable.sort-asc::after {
+    content: "\25B2";
     opacity: 1;
+}
+
+.table thead th.sortable.sort-desc::after {
+    content: "\25BC";
+    opacity: 1;
+}
+
+/* Dark Mode Toggle Switch */
+.navbar .form-switch .form-check-input {
+    width: 2.5em;
+    height: 1.25em;
+    background-color: rgba(255, 255, 255, 0.3);
+    border: none;
+    cursor: pointer;
+}
+
+.navbar .form-switch .form-check-input:checked {
+    background-color: #198754;
+}
+
+.navbar .form-switch .form-check-input:focus {
+    box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
+}
+
+/* Dark Mode Styles */
+body.dark-mode {
+    background-color: #1a1a2e;
+    color: #eaeaea;
+}
+
+body.dark-mode .bg-light {
+    background-color: #16213e !important;
+    color: #eaeaea;
+}
+
+body.dark-mode .card {
+    background-color: #16213e;
+    border-color: #0f3460;
+    color: #eaeaea;
+}
+
+body.dark-mode .table {
+    color: #eaeaea;
+}
+
+body.dark-mode .table-striped > tbody > tr:nth-of-type(odd) {
+    background-color: rgba(255, 255, 255, 0.05);
+    --bs-table-accent-bg: rgba(255, 255, 255, 0.05);
+}
+
+body.dark-mode .table-striped > tbody > tr:nth-of-type(even) {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+body.dark-mode .table-hover > tbody > tr:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    --bs-table-accent-bg: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .table-dark {
+    background-color: #0f3460;
+    color: #eaeaea;
+}
+
+body.dark-mode .table-success {
+    background-color: rgba(25, 135, 84, 0.3) !important;
+    --bs-table-bg: rgba(25, 135, 84, 0.3);
+}
+
+body.dark-mode .table-danger {
+    background-color: rgba(220, 53, 69, 0.3) !important;
+    --bs-table-bg: rgba(220, 53, 69, 0.3);
+}
+
+body.dark-mode .form-control,
+body.dark-mode .form-select {
+    background-color: #0f3460;
+    border-color: #1a1a2e;
+    color: #eaeaea;
+}
+
+body.dark-mode .form-control:focus,
+body.dark-mode .form-select:focus {
+    background-color: #16213e;
+    border-color: #0d6efd;
+    color: #eaeaea;
+}
+
+body.dark-mode .form-control::placeholder {
+    color: #8892a0;
+}
+
+body.dark-mode .text-primary {
+    color: #5dade2 !important;
+}
+
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4,
+body.dark-mode h5,
+body.dark-mode .card-title {
+    color: #eaeaea;
+}
+
+body.dark-mode .btn-warning {
+    background-color: #f0ad4e;
+    border-color: #f0ad4e;
+    color: #1a1a2e;
+}
+
+body.dark-mode .btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+body.dark-mode .btn-success {
+    background-color: #198754;
+    border-color: #198754;
+}
+
+body.dark-mode .btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+body.dark-mode .profit {
+    color: #2ecc71;
+}
+
+body.dark-mode .loss {
+    color: #e74c3c;
 }

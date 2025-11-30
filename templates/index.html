@@ -19,13 +19,17 @@
 
         <div class="mt-4 mb-4 p-3 bg-light rounded">
             <div class="row text-center">
-                <div class="col-md-6">
-                    <h4>Capital Total Invertido</h4>
-                    <h3 class="text-primary">{{printf "%.2f€" .TotalCapital}}</h3>
+                <div class="col-md-4">
+                    <h4>Volumen de Cartera</h4>
+                    <h3 class="text-primary">{{printf "%.3f€" .TotalCapital}}</h3>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
+                    <h4>Costos de Operación</h4>
+                    <h3 class="text-secondary">{{printf "%.3f€" .TotalOperationCost}}</h3>
+                </div>
+                <div class="col-md-4">
                     <h4>Utilidad Neta Actual</h4>
-                    <h3 class="{{if gt .NetProfitLoss 0.0}}profit{{else}}loss{{end}}">{{printf "%.2f€" .NetProfitLoss}}
+                    <h3 class="{{if gt .NetProfitLoss 0.0}}profit{{else}}loss{{end}}">{{printf "%.3f€" .NetProfitLoss}}
                     </h3>
                 </div>
             </div>
@@ -49,10 +53,10 @@
                     <tr class="{{if gt .ProfitLoss 0.0}}table-success{{else if lt .ProfitLoss 0.0}}table-danger{{end}}">
                         <td><strong>{{.Ticker}}</strong></td>
                         <td>{{printf "%.2f" .TotalShares}}</td>
-                        <td>{{printf "%.2f€" .InvestedCapital}}</td>
-                        <td>{{printf "%.2f€" .TotalCost}}</td>
-                        <td>{{printf "%.2f€" .CurrentValue}}</td>
-                        <td class="{{if gt .ProfitLoss 0.0}}profit{{else}}loss{{end}}">{{printf "%.2f€" .ProfitLoss}}
+                        <td>{{printf "%.3f€" .InvestedCapital}}</td>
+                        <td>{{printf "%.3f€" .TotalCost}}</td>
+                        <td>{{printf "%.3f€" .CurrentValue}}</td>
+                        <td class="{{if gt .ProfitLoss 0.0}}profit{{else}}loss{{end}}">{{printf "%.3f€" .ProfitLoss}}
                         </td>
                     </tr>
                     {{end}}
