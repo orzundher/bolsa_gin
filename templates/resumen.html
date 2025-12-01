@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumen - Mis Inversiones</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Flowbite CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
+    <link href="/static/css/common.css" rel="stylesheet">
+</head>
+
+<body class="bg-gray-50 dark:bg-gray-900">
+    {{template "header" .}}
+    
+    <div class="p-4 sm:ml-64">
+        <div class="p-4 mt-14">
+
+        <!-- Summary Table -->
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Resumen por Ticker</h2>
+        <div class="relative overflow-x-auto shadow-md sm:rounded-lg mb-8">
+            <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400" id="summaryTable">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Ticker</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Acciones</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Capital Invertido</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Costos Totales</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Valor Actual</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Utilidad (+/-)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Summaries}}
+                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 {{if gt .ProfitLoss 0.0}}bg-green-50 dark:bg-green-900/20{{else if lt .ProfitLoss 0.0}}bg-red-50 dark:bg-red-900/20{{end}}">
+                        <th scope="row" class="px-6 py-4 font-bold text-gray-900 dark:text-white whitespace-nowrap">{{.Ticker}}</th>
+                        <td class="px-6 py-4">{{printf "%.2f" .TotalShares}}</td>
+                        <td class="px-6 py-4">{{printf "%.3f€" .InvestedCapital}}</td>
+                        <td class="px-6 py-4">{{printf "%.3f€" .TotalCost}}</td>
+                        <td class="px-6 py-4">{{printf "%.3f€" .CurrentValue}}</td>
+                        <td class="px-6 py-4 font-bold {{if gt .ProfitLoss 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
+                            {{printf "%.3f€" .ProfitLoss}}
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+
+        </div>
+    </div>
+
+    <!-- Flowbite JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+    <script src="/static/js/table-sort.js"></script>
+
+</body>
+
+</html>

@@ -100,6 +100,8 @@ type SaleView struct {
 	OperationCost  float64
 	WithheldTax    float64
 	TotalSaleValue float64
+	Performance    float64
+	Profit         float64
 }
 
 var db *gorm.DB
@@ -137,6 +139,20 @@ func main() {
 			"NetProfitLoss":      netProfitLoss,
 			"TotalOperationCost": totalOperationCost,
 			"ActivePage":         "home",
+		})
+	})
+
+	// Ruta para mostrar la página de resumen
+	router.GET("/resumen", func(c *gin.Context) {
+		_, summaries, _, _, _, _, _, err := getInvestmentData()
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
+			return
+		}
+
+		c.HTML(http.StatusOK, "resumen.html", gin.H{
+			"Summaries":  summaries,
+			"ActivePage": "resumen",
 		})
 	})
 
@@ -869,10 +885,83 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 	var sales []Sale
 	db.Preload("Ticker").Order("sale_date desc").Find(&sales)
 
+	// Calcular WAC (Weighted Average Cost) histórico para cada venta
+	type Event struct {
+		Date   time.Time
+		Type   string // "buy", "sell"
+		Shares float64
+		Price  float64
+		SaleID uint
+	}
+
+	tickerEvents := make(map[uint][]Event)
+
+	// Agregar compras a eventos
+	for _, inv := range investments {
+		tickerEvents[inv.TickerID] = append(tickerEvents[inv.TickerID], Event{
+			Date:   inv.PurchaseDate,
+			Type:   "buy",
+			Shares: inv.Shares,
+			Price:  inv.PurchasePrice,
+		})
+	}
+
+	// Agregar ventas a eventos
+	for _, s := range sales {
+		tickerEvents[s.TickerID] = append(tickerEvents[s.TickerID], Event{
+			Date:   s.SaleDate,
+			Type:   "sell",
+			Shares: s.Shares,
+			Price:  s.SalePrice,
+			SaleID: s.ID,
+		})
+	}
+
+	saleWACs := make(map[uint]float64)
+
+	for _, events := range tickerEvents {
+		// Ordenar eventos por fecha
+		sort.Slice(events, func(i, j int) bool {
+			if events[i].Date.Equal(events[j].Date) {
+				// Si la fecha es igual, procesar compras antes que ventas
+				return events[i].Type == "buy"
+			}
+			return events[i].Date.Before(events[j].Date)
+		})
+
+		currentShares := 0.0
+		currentCapital := 0.0
+
+		for _, e := range events {
+			if e.Type == "buy" {
+				currentShares += e.Shares
+				currentCapital += e.Shares * e.Price
+			} else if e.Type == "sell" {
+				wac := 0.0
+				if currentShares > 0 {
+					wac = currentCapital / currentShares
+				}
+				saleWACs[e.SaleID] = wac
+
+				// Actualizar posición después de la venta (reducir capital proporcionalmente)
+				currentCapital -= e.Shares * wac
+				currentShares -= e.Shares
+			}
+		}
+	}
+
 	var saleViews []SaleView
 	for _, s := range sales {
 		tickerName := tickerNames[s.TickerID]
 		totalSaleValue := s.Shares * s.SalePrice
+
+		wac := saleWACs[s.ID]
+		profit := (s.SalePrice - wac) * s.Shares
+		performance := 0.0
+		if wac > 0 {
+			performance = (s.SalePrice - wac) / wac * 100
+		}
+
 		view := SaleView{
 			ID:             s.ID,
 			TickerID:       s.TickerID,
@@ -883,6 +972,8 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			OperationCost:  s.OperationCost,
 			WithheldTax:    s.WithheldTax,
 			TotalSaleValue: totalSaleValue,
+			Performance:    performance,
+			Profit:         profit,
 		}
 		saleViews = append(saleViews, view)
 	}

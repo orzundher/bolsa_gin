@@ -86,6 +86,8 @@
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Costo Operación</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Impuesto Retenido</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Valor Total Venta</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Rendimiento</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Utilidad</th>
                         <th scope="col" class="px-6 py-3">Acciones</th>
                     </tr>
                 </thead>
@@ -99,6 +101,12 @@
                         <td class="px-6 py-4">{{printf "%.2f€" .OperationCost}}</td>
                         <td class="px-6 py-4">{{printf "%.2f€" .WithheldTax}}</td>
                         <td class="px-6 py-4">{{printf "%.2f€" .TotalSaleValue}}</td>
+                        <td class="px-6 py-4 font-medium {{if ge .Performance 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
+                            {{printf "%.2f%%" .Performance}}
+                        </td>
+                        <td class="px-6 py-4 font-medium {{if ge .Profit 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
+                            {{printf "%.2f€" .Profit}}
+                        </td>
                         <td class="px-6 py-4">
                             <form action="/delete-sale" method="post" onsubmit="return confirm('¿Estás seguro de que quieres eliminar esta venta?');" class="inline">
                                 <input type="hidden" name="id" value="{{.ID}}">
