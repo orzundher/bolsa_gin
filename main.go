@@ -430,9 +430,9 @@ func main() {
 			withheldTax = 0 // Default to 0 if empty or invalid
 		}
 
-		saleDate, err := time.Parse("2006-01-02", saleDateStr)
+		saleDate, err := time.Parse("02/01/2006", saleDateStr)
 		if err != nil {
-			c.String(http.StatusBadRequest, "Formato de fecha inválido.")
+			c.String(http.StatusBadRequest, "Formato de fecha inválido. Use DD/MM/YYYY")
 			return
 		}
 
@@ -476,6 +476,162 @@ func main() {
 
 		log.Printf("Registro de venta con ID %d marcado como eliminado", id)
 		c.Redirect(http.StatusFound, redirectTo)
+	})
+
+	// Ruta para actualizar una venta
+	router.POST("/update-sale/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.String(http.StatusBadRequest, "ID inválido.")
+			return
+		}
+
+		var sale Sale
+		if err := db.First(&sale, id).Error; err != nil {
+			c.String(http.StatusNotFound, "Venta no encontrada.")
+			return
+		}
+
+		// Parsear y validar datos del formulario
+		tickerIDStr := c.PostForm("ticker_id")
+		saleDateStr := c.PostForm("sale_date")
+		sharesStr := strings.Replace(c.PostForm("shares"), ",", ".", -1)
+		salePriceStr := strings.Replace(c.PostForm("sale_price"), ",", ".", -1)
+		operationCostStr := strings.Replace(c.PostForm("operation_cost"), ",", ".", -1)
+		withheldTaxStr := strings.Replace(c.PostForm("withheld_tax"), ",", ".", -1)
+		redirectTo := c.PostForm("redirect_to")
+		if redirectTo == "" {
+			redirectTo = "/ventas"
+		}
+
+		tickerID, _ := strconv.Atoi(tickerIDStr)
+		shares, _ := strconv.ParseFloat(sharesStr, 64)
+		salePrice, _ := strconv.ParseFloat(salePriceStr, 64)
+		operationCost, _ := strconv.ParseFloat(operationCostStr, 64)
+		withheldTax, _ := strconv.ParseFloat(withheldTaxStr, 64)
+		saleDate, _ := time.Parse("02/01/2006", saleDateStr)
+
+		// Actualizar el registro
+		db.Model(&sale).Updates(map[string]interface{}{
+			"ticker_id":      tickerID,
+			"sale_date":      saleDate,
+			"shares":         shares,
+			"sale_price":     salePrice,
+			"operation_cost": operationCost,
+			"withheld_tax":   withheldTax,
+		})
+
+		log.Printf("Registro de venta con ID %d actualizado", id)
+		c.Redirect(http.StatusFound, redirectTo)
+	})
+
+	// Ruta para obtener detalles del cálculo de utilidad
+	router.GET("/sale-calculation/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+			return
+		}
+
+		var sale Sale
+		if err := db.Preload("Ticker").First(&sale, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Venta no encontrada"})
+			return
+		}
+
+		// Obtener todas las inversiones y ventas anteriores para este ticker
+		var investments []Investment
+		db.Where("ticker_id = ? AND purchase_date <= ?", sale.TickerID, sale.SaleDate).Order("purchase_date asc").Find(&investments)
+
+		var sales []Sale
+		db.Where("ticker_id = ? AND sale_date <= ?", sale.TickerID, sale.SaleDate).Order("sale_date asc").Find(&sales)
+
+		// Reconstruir la historia para calcular el WAC en el momento de la venta
+		type Event struct {
+			Date   time.Time
+			Type   string // "buy", "sell"
+			Shares float64
+			Price  float64
+			ID     uint
+		}
+
+		var events []Event
+		for _, inv := range investments {
+			events = append(events, Event{Date: inv.PurchaseDate, Type: "buy", Shares: inv.Shares, Price: inv.PurchasePrice, ID: inv.ID})
+		}
+		for _, s := range sales {
+			// Excluir la venta actual del cálculo histórico (queremos el estado JUSTO ANTES)
+			if s.ID == sale.ID {
+				continue
+			}
+			events = append(events, Event{Date: s.SaleDate, Type: "sell", Shares: s.Shares, Price: s.SalePrice, ID: s.ID})
+		}
+
+		// Ordenar eventos
+		sort.Slice(events, func(i, j int) bool {
+			if events[i].Date.Equal(events[j].Date) {
+				return events[i].Type == "buy"
+			}
+			return events[i].Date.Before(events[j].Date)
+		})
+
+		currentShares := 0.0
+		currentCapital := 0.0
+
+		for _, e := range events {
+			if e.Type == "buy" {
+				currentShares += e.Shares
+				currentCapital += e.Shares * e.Price
+			} else if e.Type == "sell" {
+				wac := 0.0
+				if currentShares > 0 {
+					wac = currentCapital / currentShares
+				}
+				currentCapital -= e.Shares * wac
+				currentShares -= e.Shares
+			}
+		}
+
+		// Calcular WAC final
+		wac := 0.0
+		if currentShares > 0 {
+			wac = currentCapital / currentShares
+		}
+
+		// Preparar respuesta
+		type PurchaseInfo struct {
+			Date   string  `json:"date"`
+			Shares float64 `json:"shares"`
+			Price  float64 `json:"price"`
+			Total  float64 `json:"total"`
+		}
+
+		var purchasesList []PurchaseInfo
+		for _, inv := range investments {
+			purchasesList = append(purchasesList, PurchaseInfo{
+				Date:   inv.PurchaseDate.Format("02 Jan 2006"),
+				Shares: inv.Shares,
+				Price:  inv.PurchasePrice,
+				Total:  inv.Shares * inv.PurchasePrice,
+			})
+		}
+
+		// Utilidad calculada solo con precios
+		profit := (sale.SalePrice - wac) * sale.Shares
+
+		c.JSON(http.StatusOK, gin.H{
+			"ticker":        sale.Ticker.Name,
+			"sale_date":     sale.SaleDate.Format("02 Jan 2006"),
+			"shares":        sale.Shares,
+			"sale_price":    sale.SalePrice,
+			"purchases":     purchasesList,
+			"total_capital": currentCapital, // Capital acumulado antes de la venta
+			"total_shares":  currentShares,  // Acciones acumuladas antes de la venta
+			"wac":           wac,
+			"profit":        profit,
+		})
 	})
 
 	// Ruta para mostrar el formulario de edición
@@ -896,7 +1052,7 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 
 	tickerEvents := make(map[uint][]Event)
 
-	// Agregar compras a eventos
+	// Agregar compras a eventos (sin incluir costos de operación)
 	for _, inv := range investments {
 		tickerEvents[inv.TickerID] = append(tickerEvents[inv.TickerID], Event{
 			Date:   inv.PurchaseDate,
@@ -956,6 +1112,7 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 		totalSaleValue := s.Shares * s.SalePrice
 
 		wac := saleWACs[s.ID]
+		// Utilidad calculada solo con precios, sin costos de operación ni impuestos
 		profit := (s.SalePrice - wac) * s.Shares
 		performance := 0.0
 		if wac > 0 {
