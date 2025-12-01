@@ -19,7 +19,6 @@
         <div class="p-4 mt-14">
 
         <!-- Summary Table -->
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Resumen por Ticker</h2>
         <div class="relative overflow-x-auto shadow-md sm:rounded-lg mb-8">
             <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400" id="summaryTable">
                 <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
@@ -30,6 +29,7 @@
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Costos Totales</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Valor Actual</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Utilidad (+/-)</th>
+                        <th scope="col" class="px-6 py-3">Detalle</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -43,6 +43,14 @@
                         <td class="px-6 py-4 font-bold {{if gt .ProfitLoss 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
                             {{printf "%.3f€" .ProfitLoss}}
                         </td>
+                        <td class="px-6 py-4">
+                            <a href="/ticker/{{.TickerID}}" onclick="sessionStorage.setItem('resumenScrollPosition', window.scrollY)" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300" title="Ver detalle">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                </svg>
+                            </a>
+                        </td>
                     </tr>
                     {{end}}
                 </tbody>
@@ -55,6 +63,17 @@
     <!-- Flowbite JS -->
     <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
     <script src="/static/js/table-sort.js"></script>
+    
+    <script>
+        // Restaurar posición del scroll al cargar la página
+        window.addEventListener('load', function() {
+            const scrollPosition = sessionStorage.getItem('resumenScrollPosition');
+            if (scrollPosition) {
+                window.scrollTo(0, parseInt(scrollPosition));
+                sessionStorage.removeItem('resumenScrollPosition');
+            }
+        });
+    </script>
 
 </body>
 

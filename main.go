@@ -81,6 +81,7 @@ type InvestmentView struct {
 
 // TickerSummaryView representa un resumen de las inversiones por ticker.
 type TickerSummaryView struct {
+	TickerID        uint
 	Ticker          string
 	TotalShares     float64
 	InvestedCapital float64
@@ -705,6 +706,96 @@ func main() {
 		c.Redirect(http.StatusFound, "/compras")
 	})
 
+	// API: Actualizar una compra (devuelve JSON)
+	router.PUT("/api/investment/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+			return
+		}
+
+		var investment Investment
+		if err := db.First(&investment, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Registro no encontrado"})
+			return
+		}
+
+		// Parsear JSON del body
+		var input struct {
+			TickerID      uint    `json:"ticker_id"`
+			PurchaseDate  string  `json:"purchase_date"`
+			Shares        float64 `json:"shares"`
+			PurchasePrice float64 `json:"purchase_price"`
+			OperationCost float64 `json:"operation_cost"`
+		}
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos"})
+			return
+		}
+
+		purchaseDate, _ := time.Parse("2006-01-02", input.PurchaseDate)
+
+		// Actualizar el registro
+		db.Model(&investment).Updates(map[string]interface{}{
+			"ticker_id":      input.TickerID,
+			"purchase_date":  purchaseDate,
+			"shares":         input.Shares,
+			"purchase_price": input.PurchasePrice,
+			"operation_cost": input.OperationCost,
+		})
+
+		// Obtener el ticker actualizado para devolver los datos completos
+		var ticker Ticker
+		db.First(&ticker, input.TickerID)
+
+		investedCapital := input.Shares * input.PurchasePrice
+		currentValue := input.Shares * ticker.CurrentPrice
+		profitLoss := currentValue - (investedCapital + input.OperationCost)
+
+		log.Printf("Registro de compra con ID %d actualizado via API", id)
+		c.JSON(http.StatusOK, gin.H{
+			"id":               id,
+			"ticker_id":        input.TickerID,
+			"ticker":           ticker.Name,
+			"purchase_date":    purchaseDate.Format("02 Jan 2006"),
+			"shares":           input.Shares,
+			"purchase_price":   input.PurchasePrice,
+			"operation_cost":   input.OperationCost,
+			"invested_capital": investedCapital,
+			"current_price":    ticker.CurrentPrice,
+			"current_value":    currentValue,
+			"profit_loss":      profitLoss,
+		})
+	})
+
+	// API: Obtener datos de una compra (devuelve JSON)
+	router.GET("/api/investment/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+			return
+		}
+
+		var investment Investment
+		if err := db.Preload("Ticker").First(&investment, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Registro no encontrado"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"id":             investment.ID,
+			"ticker_id":      investment.TickerID,
+			"ticker":         investment.Ticker.Name,
+			"purchase_date":  investment.PurchaseDate.Format("2006-01-02"),
+			"shares":         investment.Shares,
+			"purchase_price": investment.PurchasePrice,
+			"operation_cost": investment.OperationCost,
+		})
+	})
+
 	// Ruta para eliminar una compra
 	router.POST("/delete-investment", func(c *gin.Context) {
 		idStr := c.PostForm("id")
@@ -724,6 +815,90 @@ func main() {
 
 		log.Printf("Registro de compra con ID %d marcado como eliminado", id)
 		c.Redirect(http.StatusFound, redirectTo)
+	})
+
+	// Ruta para mostrar el detalle de un ticker
+	router.GET("/ticker/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		tickerID, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.String(http.StatusBadRequest, "ID inválido.")
+			return
+		}
+
+		// Obtener el ticker
+		var ticker Ticker
+		if err := db.First(&ticker, tickerID).Error; err != nil {
+			c.String(http.StatusNotFound, "Ticker no encontrado.")
+			return
+		}
+
+		// Obtener las compras del ticker
+		var investments []Investment
+		db.Where("ticker_id = ?", tickerID).Order("purchase_date desc").Find(&investments)
+
+		var investmentViews []InvestmentView
+		var totalInvested float64
+		var totalCostBuy float64
+		for _, i := range investments {
+			investedCapital := i.Shares * i.PurchasePrice
+			currentValue := i.Shares * ticker.CurrentPrice
+			profitLoss := currentValue - (investedCapital + i.OperationCost)
+
+			view := InvestmentView{
+				ID:              i.ID,
+				TickerID:        i.TickerID,
+				Ticker:          ticker.Name,
+				PurchaseDate:    i.PurchaseDate.Format("02 Jan 2006"),
+				Shares:          i.Shares,
+				PurchasePrice:   i.PurchasePrice,
+				OperationCost:   i.OperationCost,
+				InvestedCapital: investedCapital,
+				CurrentPrice:    ticker.CurrentPrice,
+				CurrentValue:    currentValue,
+				ProfitLoss:      profitLoss,
+			}
+			investmentViews = append(investmentViews, view)
+			totalInvested += investedCapital
+			totalCostBuy += i.OperationCost
+		}
+
+		// Obtener las ventas del ticker
+		var sales []Sale
+		db.Where("ticker_id = ?", tickerID).Order("sale_date desc").Find(&sales)
+
+		var saleViews []SaleView
+		var totalSold float64
+		var totalCostSell float64
+		for _, s := range sales {
+			totalSaleValue := s.Shares * s.SalePrice
+			view := SaleView{
+				ID:             s.ID,
+				TickerID:       s.TickerID,
+				Ticker:         ticker.Name,
+				SaleDate:       s.SaleDate.Format("02 Jan 2006"),
+				Shares:         s.Shares,
+				SalePrice:      s.SalePrice,
+				OperationCost:  s.OperationCost,
+				WithheldTax:    s.WithheldTax,
+				TotalSaleValue: totalSaleValue,
+			}
+			saleViews = append(saleViews, view)
+			totalSold += totalSaleValue
+			totalCostSell += s.OperationCost
+		}
+
+		c.HTML(http.StatusOK, "ticker_detail.html", gin.H{
+			"Ticker":        ticker,
+			"Investments":   investmentViews,
+			"Sales":         saleViews,
+			"TotalInvested": totalInvested,
+			"TotalCostBuy":  totalCostBuy,
+			"TotalSold":     totalSold,
+			"TotalCostSell": totalCostSell,
+			"TotalCosts":    totalCostBuy + totalCostSell,
+			"ActivePage":    "resumen",
+		})
 	})
 
 	port := os.Getenv("PORT")
@@ -1017,12 +1192,12 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 	}
 
 	// 4. Construir la vista de resumen por ticker
-	summaries := make(map[string]*TickerSummaryView)
+	summaries := make(map[uint]*TickerSummaryView)
 	for _, view := range investmentViews {
-		summary, ok := summaries[view.Ticker]
+		summary, ok := summaries[view.TickerID]
 		if !ok {
-			summary = &TickerSummaryView{Ticker: view.Ticker}
-			summaries[view.Ticker] = summary
+			summary = &TickerSummaryView{TickerID: view.TickerID, Ticker: view.Ticker}
+			summaries[view.TickerID] = summary
 		}
 
 		summary.TotalShares += view.Shares
