@@ -77,6 +77,7 @@ type InvestmentView struct {
 	CurrentPrice    float64
 	CurrentValue    float64
 	ProfitLoss      float64
+	Performance     float64
 }
 
 // TickerSummaryView representa un resumen de las inversiones por ticker.
@@ -993,6 +994,10 @@ func main() {
 			investedCapital := i.Shares * i.PurchasePrice
 			currentValue := i.Shares * ticker.CurrentPrice
 			profitLoss := currentValue - (investedCapital + i.OperationCost)
+			performance := 0.0
+			if i.PurchasePrice > 0 {
+				performance = (ticker.CurrentPrice - i.PurchasePrice) / i.PurchasePrice * 100
+			}
 
 			view := InvestmentView{
 				ID:              i.ID,
@@ -1006,6 +1011,7 @@ func main() {
 				CurrentPrice:    ticker.CurrentPrice,
 				CurrentValue:    currentValue,
 				ProfitLoss:      profitLoss,
+				Performance:     performance,
 			}
 			investmentViews = append(investmentViews, view)
 			totalInvested += investedCapital
@@ -1319,6 +1325,10 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 		investedCapital := i.Shares * i.PurchasePrice
 		currentValue := i.Shares * currentPrice
 		profitLoss := currentValue - (investedCapital + i.OperationCost)
+		performance := 0.0
+		if i.PurchasePrice > 0 {
+			performance = (currentPrice - i.PurchasePrice) / i.PurchasePrice * 100
+		}
 
 		view := InvestmentView{
 			ID:              i.ID,
@@ -1332,6 +1342,7 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			CurrentPrice:    currentPrice,
 			CurrentValue:    currentValue,
 			ProfitLoss:      profitLoss,
+			Performance:     performance,
 		}
 
 		totalCapital += investedCapital + i.OperationCost
@@ -1356,14 +1367,26 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 		summary.ProfitLoss += view.ProfitLoss
 	}
 
+	// 5. Obtener todas las ventas de la BD con preload del ticker
+	var sales []Sale
+	db.Preload("Ticker").Order("sale_date desc").Find(&sales)
+
+	// Restar las acciones vendidas del resumen y ajustar valores
+	for _, s := range sales {
+		if summary, ok := summaries[s.TickerID]; ok {
+			summary.TotalShares -= s.Shares
+			// Ajustar el valor actual basado en las acciones restantes
+			currentPrice := tickerPrices[s.TickerID]
+			summary.CurrentValue = summary.TotalShares * currentPrice
+			// Recalcular la utilidad
+			summary.ProfitLoss = summary.CurrentValue - (summary.InvestedCapital + summary.TotalCost)
+		}
+	}
+
 	var summaryViews []TickerSummaryView
 	for _, summary := range summaries {
 		summaryViews = append(summaryViews, *summary)
 	}
-
-	// 5. Obtener todas las ventas de la BD con preload del ticker
-	var sales []Sale
-	db.Preload("Ticker").Order("sale_date desc").Find(&sales)
 
 	// Calcular WAC (Weighted Average Cost) histórico para cada venta
 	type Event struct {

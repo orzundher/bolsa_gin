@@ -36,7 +36,7 @@
                     {{range .Summaries}}
                     <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 {{if gt .ProfitLoss 0.0}}bg-green-50 dark:bg-green-900/20{{else if lt .ProfitLoss 0.0}}bg-red-50 dark:bg-red-900/20{{end}}">
                         <th scope="row" class="px-6 py-4 font-bold text-gray-900 dark:text-white whitespace-nowrap">{{.Ticker}}</th>
-                        <td class="px-6 py-4">{{printf "%.2f" .TotalShares}}</td>
+                        <td class="px-6 py-4">{{printf "%.6f" .TotalShares}}</td>
                         <td class="px-6 py-4">{{printf "%.3f€" .InvestedCapital}}</td>
                         <td class="px-6 py-4">{{printf "%.3f€" .TotalCost}}</td>
                         <td class="px-6 py-4">{{printf "%.3f€" .CurrentValue}}</td>

@@ -14,20 +14,20 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Add AJAX form submit handler
-    const editSaleForm = document.getElementById('editSaleForm');
-    if (editSaleForm) {
-        editSaleForm.addEventListener('submit', handleEditFormSubmit);
-    }
 });
 
 /**
- * Handle edit form submission via AJAX
+ * Submit edit form via AJAX
  */
-function handleEditFormSubmit(event) {
-    event.preventDefault();
-
-    const form = event.target;
+function submitEditForm() {
+    const form = document.getElementById('editSaleForm');
+    
+    // Validate form
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+    
     const saleId = document.getElementById('edit_sale_id').value;
 
     // Get form values
