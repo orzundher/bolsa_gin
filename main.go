@@ -796,6 +796,155 @@ func main() {
 		})
 	})
 
+	// API: Actualizar una venta (devuelve JSON)
+	router.PUT("/api/sale/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+			return
+		}
+
+		var sale Sale
+		if err := db.First(&sale, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Venta no encontrada"})
+			return
+		}
+
+		// Parsear JSON del body
+		var input struct {
+			TickerID      uint    `json:"ticker_id"`
+			SaleDate      string  `json:"sale_date"`
+			Shares        float64 `json:"shares"`
+			SalePrice     float64 `json:"sale_price"`
+			OperationCost float64 `json:"operation_cost"`
+			WithheldTax   float64 `json:"withheld_tax"`
+		}
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos"})
+			return
+		}
+
+		saleDate, _ := time.Parse("2006-01-02", input.SaleDate)
+
+		// Actualizar el registro
+		db.Model(&sale).Updates(map[string]interface{}{
+			"ticker_id":      input.TickerID,
+			"sale_date":      saleDate,
+			"shares":         input.Shares,
+			"sale_price":     input.SalePrice,
+			"operation_cost": input.OperationCost,
+			"withheld_tax":   input.WithheldTax,
+		})
+
+		// Obtener el ticker actualizado
+		var ticker Ticker
+		db.First(&ticker, input.TickerID)
+
+		// Calcular valores para la respuesta
+		totalSaleValue := input.Shares * input.SalePrice
+
+		// Calcular WAC y utilidad (similar a sale-calculation)
+		var investments []Investment
+		db.Where("ticker_id = ? AND purchase_date <= ?", input.TickerID, saleDate).Order("purchase_date asc").Find(&investments)
+
+		var previousSales []Sale
+		db.Where("ticker_id = ? AND sale_date <= ? AND id != ?", input.TickerID, saleDate, id).Order("sale_date asc").Find(&previousSales)
+
+		type Event struct {
+			Date   time.Time
+			Type   string
+			Shares float64
+			Price  float64
+		}
+
+		var events []Event
+		for _, inv := range investments {
+			events = append(events, Event{Date: inv.PurchaseDate, Type: "buy", Shares: inv.Shares, Price: inv.PurchasePrice})
+		}
+		for _, s := range previousSales {
+			events = append(events, Event{Date: s.SaleDate, Type: "sell", Shares: s.Shares, Price: s.SalePrice})
+		}
+
+		sort.Slice(events, func(i, j int) bool {
+			if events[i].Date.Equal(events[j].Date) {
+				return events[i].Type == "buy"
+			}
+			return events[i].Date.Before(events[j].Date)
+		})
+
+		currentShares := 0.0
+		currentCapital := 0.0
+
+		for _, e := range events {
+			if e.Type == "buy" {
+				currentShares += e.Shares
+				currentCapital += e.Shares * e.Price
+			} else if e.Type == "sell" {
+				wac := 0.0
+				if currentShares > 0 {
+					wac = currentCapital / currentShares
+				}
+				currentCapital -= e.Shares * wac
+				currentShares -= e.Shares
+			}
+		}
+
+		wac := 0.0
+		if currentShares > 0 {
+			wac = currentCapital / currentShares
+		}
+
+		profit := (input.SalePrice - wac) * input.Shares
+		performance := 0.0
+		if wac > 0 {
+			performance = ((input.SalePrice - wac) / wac) * 100
+		}
+
+		log.Printf("Registro de venta con ID %d actualizado via API", id)
+		c.JSON(http.StatusOK, gin.H{
+			"id":               id,
+			"ticker_id":        input.TickerID,
+			"ticker":           ticker.Name,
+			"sale_date":        saleDate.Format("02 Jan 2006"),
+			"shares":           input.Shares,
+			"sale_price":       input.SalePrice,
+			"operation_cost":   input.OperationCost,
+			"withheld_tax":     input.WithheldTax,
+			"total_sale_value": totalSaleValue,
+			"performance":      performance,
+			"profit":           profit,
+		})
+	})
+
+	// API: Obtener datos de una venta (devuelve JSON)
+	router.GET("/api/sale/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+			return
+		}
+
+		var sale Sale
+		if err := db.Preload("Ticker").First(&sale, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Venta no encontrada"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"id":             sale.ID,
+			"ticker_id":      sale.TickerID,
+			"ticker":         sale.Ticker.Name,
+			"sale_date":      sale.SaleDate.Format("2006-01-02"),
+			"shares":         sale.Shares,
+			"sale_price":     sale.SalePrice,
+			"operation_cost": sale.OperationCost,
+			"withheld_tax":   sale.WithheldTax,
+		})
+	})
+
 	// Ruta para eliminar una compra
 	router.POST("/delete-investment", func(c *gin.Context) {
 		idStr := c.PostForm("id")
