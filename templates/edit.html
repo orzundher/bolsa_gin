@@ -5,50 +5,58 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Editar Inversión</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Flowbite CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
     <link href="/static/css/common.css" rel="stylesheet">
 </head>
-<body>
+<body class="bg-gray-50 dark:bg-gray-900">
     {{template "header.html" .}}
-    <div class="container mt-4">
-        <h1>Editar Registro de Compra</h1>
-        <div class="card">
-            <div class="card-body">
-                <form action="/update/{{.Investment.ID}}" method="post">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label for="ticker_id" class="form-label">Ticker</label>
-                            <select name="ticker_id" id="ticker_id" class="form-select" required>
-                                <option value="">Seleccionar ticker...</option>
-                                {{range .Tickers}}
-                                <option value="{{.ID}}" {{if eq .ID $.Investment.TickerID}}selected{{end}}>{{.Name}}</option>
-                                {{end}}
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label for="purchase_date" class="form-label">Fecha Compra</label>
-                            <input type="date" name="purchase_date" id="purchase_date" class="form-control" value="{{.Investment.PurchaseDate.Format "2006-01-02"}}" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="shares" class="form-label">Acciones</label>
-                            <input type="number" step="any" name="shares" id="shares" class="form-control" value="{{printf "%f" .Investment.Shares}}" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="purchase_price" class="form-label">Precio Compra</label>
-                            <input type="number" step="any" name="purchase_price" id="purchase_price" class="form-control" value="{{printf "%f" .Investment.PurchasePrice}}" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="operation_cost" class="form-label">Costo Operación</label>
-                            <input type="number" step="any" name="operation_cost" id="operation_cost" class="form-control" value="{{printf "%f" .Investment.OperationCost}}">
-                        </div>
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-6">Editar Registro de Compra</h1>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <form action="/update/{{.Investment.ID}}" method="post">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="ticker_id" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Ticker</label>
+                        <select name="ticker_id" id="ticker_id" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" required>
+                            <option value="">Seleccionar ticker...</option>
+                            {{range .Tickers}}
+                            <option value="{{.ID}}" {{if eq .ID $.Investment.TickerID}}selected{{end}}>{{.Name}}</option>
+                            {{end}}
+                        </select>
                     </div>
-                    <div class="mt-4">
-                        <button type="submit" class="btn btn-primary">Guardar Cambios</button>
-                        <a href="/compras" class="btn btn-secondary">Cancelar</a>
+                    <div>
+                        <label for="purchase_date" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Fecha Compra</label>
+                        <input type="date" name="purchase_date" id="purchase_date" value="{{.Investment.PurchaseDate.Format "2006-01-02"}}" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" required>
                     </div>
-                </form>
-            </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div>
+                        <label for="shares" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Acciones</label>
+                        <input type="number" step="any" name="shares" id="shares" value="{{printf "%f" .Investment.Shares}}" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" required>
+                    </div>
+                    <div>
+                        <label for="purchase_price" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Precio Compra</label>
+                        <input type="number" step="any" name="purchase_price" id="purchase_price" value="{{printf "%f" .Investment.PurchasePrice}}" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" required>
+                    </div>
+                    <div>
+                        <label for="operation_cost" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Costo Operación</label>
+                        <input type="number" step="any" name="operation_cost" id="operation_cost" value="{{printf "%f" .Investment.OperationCost}}" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                    </div>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button type="submit" class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-blue-800">Guardar Cambios</button>
+                    <a href="/compras" class="text-gray-900 bg-white border border-gray-300 hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-gray-600 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-700 dark:focus:ring-gray-700">Cancelar</a>
+                </div>
+            </form>
         </div>
     </div>
+    
+    <!-- Flowbite JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
 </body>
 </html>

@@ -1,56 +1,71 @@
 {{define "header"}}
-<header>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary" style="padding: 0.3rem 1rem; min-height: auto;">
-        <div class="container-fluid" style="padding: 0;">
-            <a class="navbar-brand" href="/" style="font-size: 1.1rem; font-weight: 600; margin-right: 2rem;">INVESTMENT TRACKER</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link {{if eq .ActivePage "home"}}active-page{{end}}" href="/">Inicio</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{if eq .ActivePage "compras"}}active-page{{end}}" href="/compras">Compras</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{if eq .ActivePage "ventas"}}active-page{{end}}" href="/ventas">Ventas</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{if eq .ActivePage "precios"}}active-page{{end}}" href="/precios">Precios</a>
-                    </li>
-                </ul>
-                <ul class="navbar-nav ms-auto align-items-center">
-                    <li class="nav-item d-flex align-items-center">
-                        <span class="text-light me-2" style="font-size: 0.85rem;">Dark Mode</span>
-                        <div class="form-check form-switch mb-0">
-                            <input class="form-check-input" type="checkbox" role="switch" id="darkModeToggle" onchange="toggleDarkMode()" style="cursor: pointer;">
-                        </div>
-                    </li>
-                </ul>
-            </div>
+<nav class="bg-blue-600 dark:bg-gray-900 border-b border-blue-700 dark:border-gray-700">
+    <div class="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-3">
+        <a href="/" class="flex items-center space-x-3 rtl:space-x-reverse">
+            <span class="self-center text-xl font-semibold whitespace-nowrap text-white">INVESTMENT TRACKER</span>
+        </a>
+        <button data-collapse-toggle="navbar-default" type="button" class="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-white rounded-lg md:hidden hover:bg-blue-700 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-gray-600" aria-controls="navbar-default" aria-expanded="false">
+            <span class="sr-only">Open main menu</span>
+            <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 17 14">
+                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 1h15M1 7h15M1 13h15"/>
+            </svg>
+        </button>
+        <div class="hidden w-full md:block md:w-auto" id="navbar-default">
+            <ul class="font-medium flex flex-col p-4 md:p-0 mt-4 border border-blue-700 rounded-lg bg-blue-500 md:bg-transparent md:flex-row md:space-x-8 rtl:space-x-reverse md:mt-0 md:border-0 dark:bg-gray-800 md:dark:bg-transparent dark:border-gray-700">
+                <li>
+                    <a href="/" class="block py-2 px-3 rounded {{if eq .ActivePage "home"}}text-white bg-blue-700 md:bg-blue-800 md:text-white{{else}}text-blue-100 hover:bg-blue-700 md:hover:bg-transparent md:hover:text-white{{end}} md:p-2 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white md:dark:hover:bg-transparent" {{if eq .ActivePage "home"}}aria-current="page"{{end}}>Inicio</a>
+                </li>
+                <li>
+                    <a href="/compras" class="block py-2 px-3 rounded {{if eq .ActivePage "compras"}}text-white bg-blue-700 md:bg-blue-800 md:text-white{{else}}text-blue-100 hover:bg-blue-700 md:hover:bg-transparent md:hover:text-white{{end}} md:p-2 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white md:dark:hover:bg-transparent">Compras</a>
+                </li>
+                <li>
+                    <a href="/ventas" class="block py-2 px-3 rounded {{if eq .ActivePage "ventas"}}text-white bg-blue-700 md:bg-blue-800 md:text-white{{else}}text-blue-100 hover:bg-blue-700 md:hover:bg-transparent md:hover:text-white{{end}} md:p-2 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white md:dark:hover:bg-transparent">Ventas</a>
+                </li>
+                <li>
+                    <a href="/precios" class="block py-2 px-3 rounded {{if eq .ActivePage "precios"}}text-white bg-blue-700 md:bg-blue-800 md:text-white{{else}}text-blue-100 hover:bg-blue-700 md:hover:bg-transparent md:hover:text-white{{end}} md:p-2 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white md:dark:hover:bg-transparent">Precios</a>
+                </li>
+                <li class="flex items-center space-x-2 py-2 px-3 md:p-2">
+                    <span class="text-blue-100 dark:text-gray-300 text-sm">Dark Mode</span>
+                    <button id="darkModeToggle" type="button" class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-gray-600 bg-gray-300 dark:bg-blue-600">
+                        <span class="sr-only">Toggle dark mode</span>
+                        <span id="darkModeToggleCircle" class="inline-block w-4 h-4 transform transition-transform bg-white rounded-full translate-x-1 dark:translate-x-6"></span>
+                    </button>
+                </li>
+            </ul>
         </div>
-    </nav>
-</header>
+    </div>
+</nav>
 <script>
     function toggleDarkMode() {
-        const body = document.body;
+        const html = document.documentElement;
         const toggle = document.getElementById('darkModeToggle');
-        const isDark = toggle.checked;
-        body.classList.toggle('dark-mode', isDark);
-        localStorage.setItem('darkMode', isDark ? 'enabled' : 'disabled');
+        const circle = document.getElementById('darkModeToggleCircle');
+        
+        if (html.classList.contains('dark')) {
+            html.classList.remove('dark');
+            localStorage.setItem('darkMode', 'disabled');
+        } else {
+            html.classList.add('dark');
+            localStorage.setItem('darkMode', 'enabled');
+        }
     }
 
     // Aplicar preferencia guardada al cargar
     (function() {
         const savedMode = localStorage.getItem('darkMode');
-        const toggle = document.getElementById('darkModeToggle');
-        if (savedMode === 'enabled') {
-            document.body.classList.add('dark-mode');
-            if (toggle) toggle.checked = true;
+        const html = document.documentElement;
+        
+        if (savedMode === 'enabled' || (!savedMode && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            html.classList.add('dark');
         }
     })();
+
+    // Event listener para el toggle
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggle = document.getElementById('darkModeToggle');
+        if (toggle) {
+            toggle.addEventListener('click', toggleDarkMode);
+        }
+    });
 </script>
 {{end}}
