@@ -9,15 +9,21 @@
     <link href="/static/css/common.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container mt-5">
+    {{template "header.html" .}}
+    <div class="container mt-4">
         <h1>Editar Registro de Compra</h1>
         <div class="card">
             <div class="card-body">
                 <form action="/update/{{.Investment.ID}}" method="post">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label for="ticker" class="form-label">Ticker</label>
-                            <input type="text" name="ticker" id="ticker" class="form-control" value="{{.Investment.Ticker}}" required>
+                            <label for="ticker_id" class="form-label">Ticker</label>
+                            <select name="ticker_id" id="ticker_id" class="form-select" required>
+                                <option value="">Seleccionar ticker...</option>
+                                {{range .Tickers}}
+                                <option value="{{.ID}}" {{if eq .ID $.Investment.TickerID}}selected{{end}}>{{.Name}}</option>
+                                {{end}}
+                            </select>
                         </div>
                         <div class="col-md-6">
                             <label for="purchase_date" class="form-label">Fecha Compra</label>
@@ -38,7 +44,7 @@
                     </div>
                     <div class="mt-4">
                         <button type="submit" class="btn btn-primary">Guardar Cambios</button>
-                        <a href="/" class="btn btn-secondary">Cancelar</a>
+                        <a href="/compras" class="btn btn-secondary">Cancelar</a>
                     </div>
                 </form>
             </div>

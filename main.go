@@ -1,40 +1,53 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/driver/sqlite"
+	"github.com/joho/godotenv"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 // --- MODELOS DE GORM ---
 
+// Migration trackea las migraciones ejecutadas
+type Migration struct {
+	ID        uint   `gorm:"primaryKey"`
+	Name      string `gorm:"uniqueIndex"`
+	AppliedAt time.Time
+}
+
+// Ticker representa un símbolo bursátil con su precio actual.
+type Ticker struct {
+	gorm.Model
+	Name         string `gorm:"uniqueIndex"`
+	CurrentPrice float64
+}
+
 // Investment representa una única compra de acciones en la BD.
 type Investment struct {
 	gorm.Model
-	Ticker        string
+	TickerID      uint
+	Ticker        Ticker `gorm:"foreignKey:TickerID"`
 	PurchaseDate  time.Time
 	Shares        float64
 	PurchasePrice float64
 	OperationCost float64
 }
 
-// MarketData almacena el precio de mercado actual para un ticker.
-type MarketData struct {
-	Ticker       string `gorm:"primaryKey"`
-	CurrentPrice float64
-}
-
 // Sale representa una única venta de acciones en la BD.
 type Sale struct {
 	gorm.Model
-	Ticker        string
+	TickerID      uint
+	Ticker        Ticker `gorm:"foreignKey:TickerID"`
 	SaleDate      time.Time
 	Shares        float64
 	SalePrice     float64
@@ -44,9 +57,17 @@ type Sale struct {
 
 // --- VISTAS ---
 
+// TickerView representa los datos de un ticker para mostrar en la UI.
+type TickerView struct {
+	ID           uint
+	Name         string
+	CurrentPrice float64
+}
+
 // InvestmentView representa los datos de inversión que se mostrarán en la página.
 type InvestmentView struct {
 	ID              uint
+	TickerID        uint
 	Ticker          string
 	PurchaseDate    string
 	Shares          float64
@@ -71,6 +92,7 @@ type TickerSummaryView struct {
 // SaleView representa los datos de venta que se mostrarán en la página.
 type SaleView struct {
 	ID             uint
+	TickerID       uint
 	Ticker         string
 	SaleDate       string
 	Shares         float64
@@ -83,6 +105,11 @@ type SaleView struct {
 var db *gorm.DB
 
 func main() {
+	// Cargar variables de entorno desde .env
+	if err := godotenv.Load(); err != nil {
+		log.Println("No se encontró archivo .env, usando variables de entorno del sistema")
+	}
+
 	var err error
 	// Configurar la base de datos con GORM
 	db, err = setupDatabase()
@@ -93,102 +120,187 @@ func main() {
 	// Configurar Gin
 	router := gin.Default()
 	router.LoadHTMLGlob("templates/*")
+	router.Static("/static", "./static")
 
 	// Ruta principal para mostrar los datos
 	router.GET("/", func(c *gin.Context) {
-		investments, summaries, _, totalCapital, netProfitLoss, _, uniqueTickers, err := getInvestmentData()
+		investments, summaries, _, totalCapital, netProfitLoss, totalOperationCost, _, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
 		}
 
 		c.HTML(http.StatusOK, "index.html", gin.H{
-			"Investments":   investments,
-			"Summaries":     summaries,
-			"TotalCapital":  totalCapital,
-			"NetProfitLoss": netProfitLoss,
-			"UniqueTickers": uniqueTickers,
-			"ActivePage":    "home",
+			"Investments":        investments,
+			"Summaries":          summaries,
+			"TotalCapital":       totalCapital,
+			"NetProfitLoss":      netProfitLoss,
+			"TotalOperationCost": totalOperationCost,
+			"ActivePage":         "home",
 		})
-		log.Printf("Unique Tickers passed to template: %v", uniqueTickers)
 	})
 
 	// Ruta para mostrar la página de compras
 	router.GET("/compras", func(c *gin.Context) {
-		investments, _, _, _, _, _, uniqueTickers, err := getInvestmentData()
+		investments, _, _, _, _, _, _, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
 		}
 
+		// Obtener todos los tickers disponibles
+		var tickers []Ticker
+		db.Order("name").Find(&tickers)
+		var tickerViews []TickerView
+		for _, t := range tickers {
+			tickerViews = append(tickerViews, TickerView{ID: t.ID, Name: t.Name, CurrentPrice: t.CurrentPrice})
+		}
+
 		c.HTML(http.StatusOK, "compras.html", gin.H{
-			"Investments":   investments,
-			"UniqueTickers": uniqueTickers,
-			"ActivePage":    "compras",
+			"Investments": investments,
+			"Tickers":     tickerViews,
+			"ActivePage":  "compras",
 		})
 	})
 
 	// Ruta para mostrar la página de ventas
 	router.GET("/ventas", func(c *gin.Context) {
-		_, _, sales, _, _, _, uniqueTickers, err := getInvestmentData()
+		_, _, sales, _, _, _, _, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
 		}
 
+		// Obtener todos los tickers disponibles
+		var tickers []Ticker
+		db.Order("name").Find(&tickers)
+		var tickerViews []TickerView
+		for _, t := range tickers {
+			tickerViews = append(tickerViews, TickerView{ID: t.ID, Name: t.Name, CurrentPrice: t.CurrentPrice})
+		}
+
 		c.HTML(http.StatusOK, "ventas.html", gin.H{
-			"Sales":         sales,
-			"UniqueTickers": uniqueTickers,
-			"ActivePage":    "ventas",
+			"Sales":      sales,
+			"Tickers":    tickerViews,
+			"ActivePage": "ventas",
 		})
 	})
 
 	// Ruta para mostrar la página de precios
 	router.GET("/precios", func(c *gin.Context) {
-		_, _, _, _, _, currentPrices, _, err := getInvestmentData()
-		if err != nil {
-			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
-			return
+		var tickers []Ticker
+		db.Order("name").Find(&tickers)
+
+		var tickerViews []TickerView
+		for _, t := range tickers {
+			tickerViews = append(tickerViews, TickerView{
+				ID:           t.ID,
+				Name:         t.Name,
+				CurrentPrice: t.CurrentPrice,
+			})
 		}
 
 		c.HTML(http.StatusOK, "precios.html", gin.H{
-			"CurrentPrices": currentPrices,
-			"ActivePage":    "precios",
+			"Tickers":    tickerViews,
+			"ActivePage": "precios",
 		})
 	})
 
-	// Ruta para actualizar los precios
-	router.POST("/update-prices", func(c *gin.Context) {
-		err := c.Request.ParseForm()
-		if err != nil {
-			c.String(http.StatusBadRequest, "Error al parsear el formulario: %v", err)
+	// Ruta para agregar un nuevo ticker
+	router.POST("/add-ticker", func(c *gin.Context) {
+		name := strings.ToUpper(c.PostForm("name"))
+		priceStr := strings.Replace(c.PostForm("current_price"), ",", ".", -1)
+
+		if name == "" {
+			c.String(http.StatusBadRequest, "El nombre del ticker es obligatorio.")
 			return
 		}
 
-		redirectTo := c.PostForm("redirect_to")
-		if redirectTo == "" {
-			redirectTo = "/"
+		price, err := strconv.ParseFloat(priceStr, 64)
+		if err != nil {
+			price = 0
 		}
 
-		for ticker, newPriceStr := range c.Request.PostForm {
-			// Ignorar el campo redirect_to
-			if ticker == "redirect_to" {
-				continue
-			}
-			// Reemplazar coma por punto para asegurar el parseo correcto
-			priceStrWithDot := strings.Replace(newPriceStr[0], ",", ".", -1)
-			if newPrice, err := strconv.ParseFloat(priceStrWithDot, 64); err == nil {
-				log.Printf("Actualizando precio para %s en la BD: %.2f", ticker, newPrice)
-				db.Save(&MarketData{Ticker: ticker, CurrentPrice: newPrice})
-			}
+		// Verificar si ya existe
+		var existing Ticker
+		if db.Where("name = ?", name).First(&existing).Error == nil {
+			c.String(http.StatusBadRequest, "El ticker ya existe.")
+			return
 		}
-		c.Redirect(http.StatusFound, redirectTo)
+
+		newTicker := Ticker{Name: name, CurrentPrice: price}
+		db.Create(&newTicker)
+
+		log.Printf("Nuevo ticker creado: %s", name)
+		c.Redirect(http.StatusFound, "/precios")
+	})
+
+	// Ruta para actualizar un ticker (nombre y/o precio)
+	router.POST("/update-ticker/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.String(http.StatusBadRequest, "ID inválido.")
+			return
+		}
+
+		var ticker Ticker
+		if err := db.First(&ticker, id).Error; err != nil {
+			c.String(http.StatusNotFound, "Ticker no encontrado.")
+			return
+		}
+
+		name := strings.ToUpper(c.PostForm("name"))
+		priceStr := strings.Replace(c.PostForm("current_price"), ",", ".", -1)
+
+		if name == "" {
+			c.String(http.StatusBadRequest, "El nombre del ticker es obligatorio.")
+			return
+		}
+
+		price, err := strconv.ParseFloat(priceStr, 64)
+		if err != nil {
+			price = ticker.CurrentPrice
+		}
+
+		db.Model(&ticker).Updates(map[string]interface{}{
+			"name":          name,
+			"current_price": price,
+		})
+
+		log.Printf("Ticker %d actualizado: %s", id, name)
+		c.Redirect(http.StatusFound, "/precios")
+	})
+
+	// Ruta para eliminar un ticker
+	router.POST("/delete-ticker", func(c *gin.Context) {
+		idStr := c.PostForm("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.String(http.StatusBadRequest, "ID inválido.")
+			return
+		}
+
+		// Verificar si hay inversiones o ventas asociadas
+		var investmentCount int64
+		var saleCount int64
+		db.Model(&Investment{}).Where("ticker_id = ?", id).Count(&investmentCount)
+		db.Model(&Sale{}).Where("ticker_id = ?", id).Count(&saleCount)
+
+		if investmentCount > 0 || saleCount > 0 {
+			c.String(http.StatusBadRequest, "No se puede eliminar el ticker porque tiene inversiones o ventas asociadas.")
+			return
+		}
+
+		db.Delete(&Ticker{}, id)
+		log.Printf("Ticker %d eliminado", id)
+		c.Redirect(http.StatusFound, "/precios")
 	})
 
 	// Ruta para registrar una nueva compra
 	router.POST("/add-investment", func(c *gin.Context) {
 		// Parsear valores del formulario
-		ticker := strings.ToUpper(c.PostForm("ticker"))
+		tickerIDStr := c.PostForm("ticker_id")
 		purchaseDateStr := c.PostForm("purchase_date")
 		sharesStr := strings.Replace(c.PostForm("shares"), ",", ".", -1)
 		purchasePriceStr := strings.Replace(c.PostForm("purchase_price"), ",", ".", -1)
@@ -199,8 +311,14 @@ func main() {
 		}
 
 		// Validar y convertir tipos
-		if ticker == "" || purchaseDateStr == "" {
-			c.String(http.StatusBadRequest, "Ticker y fecha son obligatorios.")
+		tickerID, err := strconv.Atoi(tickerIDStr)
+		if err != nil || tickerID <= 0 {
+			c.String(http.StatusBadRequest, "Debe seleccionar un ticker válido.")
+			return
+		}
+
+		if purchaseDateStr == "" {
+			c.String(http.StatusBadRequest, "La fecha es obligatoria.")
 			return
 		}
 
@@ -221,15 +339,22 @@ func main() {
 			operationCost = 0 // Default to 0 if empty or invalid
 		}
 
-		purchaseDate, err := time.Parse("2006-01-02", purchaseDateStr) // El formato de input type=date
+		purchaseDate, err := time.Parse("2006-01-02", purchaseDateStr)
 		if err != nil {
 			c.String(http.StatusBadRequest, "Formato de fecha inválido.")
 			return
 		}
 
+		// Verificar que el ticker existe
+		var ticker Ticker
+		if err := db.First(&ticker, tickerID).Error; err != nil {
+			c.String(http.StatusBadRequest, "El ticker seleccionado no existe.")
+			return
+		}
+
 		// Crear la nueva inversión
 		newInvestment := Investment{
-			Ticker:        ticker,
+			TickerID:      uint(tickerID),
 			PurchaseDate:  purchaseDate,
 			Shares:        shares,
 			PurchasePrice: purchasePrice,
@@ -237,17 +362,14 @@ func main() {
 		}
 		db.Create(&newInvestment)
 
-		// Si el ticker es nuevo, añadirlo a MarketData con el precio de compra
-		db.FirstOrCreate(&MarketData{Ticker: ticker}, &MarketData{Ticker: ticker, CurrentPrice: purchasePrice})
-
-		log.Printf("Nueva compra registrada para %s", ticker)
+		log.Printf("Nueva compra registrada para ticker ID %d", tickerID)
 		c.Redirect(http.StatusFound, redirectTo)
 	})
 
 	// Ruta para registrar una nueva venta
 	router.POST("/add-sale", func(c *gin.Context) {
 		// Parsear valores del formulario
-		ticker := strings.ToUpper(c.PostForm("ticker"))
+		tickerIDStr := c.PostForm("ticker_id")
 		saleDateStr := c.PostForm("sale_date")
 		sharesStr := strings.Replace(c.PostForm("shares"), ",", ".", -1)
 		salePriceStr := strings.Replace(c.PostForm("sale_price"), ",", ".", -1)
@@ -259,8 +381,14 @@ func main() {
 		}
 
 		// Validar y convertir tipos
-		if ticker == "" || saleDateStr == "" {
-			c.String(http.StatusBadRequest, "Ticker y fecha de venta son obligatorios.")
+		tickerID, err := strconv.Atoi(tickerIDStr)
+		if err != nil || tickerID <= 0 {
+			c.String(http.StatusBadRequest, "Debe seleccionar un ticker válido.")
+			return
+		}
+
+		if saleDateStr == "" {
+			c.String(http.StatusBadRequest, "La fecha de venta es obligatoria.")
 			return
 		}
 
@@ -286,15 +414,22 @@ func main() {
 			withheldTax = 0 // Default to 0 if empty or invalid
 		}
 
-		saleDate, err := time.Parse("2006-01-02", saleDateStr) // El formato de input type=date
+		saleDate, err := time.Parse("2006-01-02", saleDateStr)
 		if err != nil {
 			c.String(http.StatusBadRequest, "Formato de fecha inválido.")
 			return
 		}
 
+		// Verificar que el ticker existe
+		var ticker Ticker
+		if err := db.First(&ticker, tickerID).Error; err != nil {
+			c.String(http.StatusBadRequest, "El ticker seleccionado no existe.")
+			return
+		}
+
 		// Crear la nueva venta
 		newSale := Sale{
-			Ticker:        ticker,
+			TickerID:      uint(tickerID),
 			SaleDate:      saleDate,
 			Shares:        shares,
 			SalePrice:     salePrice,
@@ -303,7 +438,7 @@ func main() {
 		}
 		db.Create(&newSale)
 
-		log.Printf("Nueva venta registrada para %s", ticker)
+		log.Printf("Nueva venta registrada para ticker ID %d", tickerID)
 		c.Redirect(http.StatusFound, redirectTo)
 	})
 
@@ -337,13 +472,23 @@ func main() {
 		}
 
 		var investment Investment
-		if err := db.First(&investment, id).Error; err != nil {
+		if err := db.Preload("Ticker").First(&investment, id).Error; err != nil {
 			c.String(http.StatusNotFound, "Registro no encontrado.")
 			return
 		}
 
+		// Obtener todos los tickers disponibles
+		var tickers []Ticker
+		db.Order("name").Find(&tickers)
+		var tickerViews []TickerView
+		for _, t := range tickers {
+			tickerViews = append(tickerViews, TickerView{ID: t.ID, Name: t.Name, CurrentPrice: t.CurrentPrice})
+		}
+
 		c.HTML(http.StatusOK, "edit.html", gin.H{
 			"Investment": investment,
+			"Tickers":    tickerViews,
+			"ActivePage": "compras",
 		})
 	})
 
@@ -363,12 +508,13 @@ func main() {
 		}
 
 		// Parsear y validar datos del formulario
-		ticker := strings.ToUpper(c.PostForm("ticker"))
+		tickerIDStr := c.PostForm("ticker_id")
 		purchaseDateStr := c.PostForm("purchase_date")
 		sharesStr := strings.Replace(c.PostForm("shares"), ",", ".", -1)
 		purchasePriceStr := strings.Replace(c.PostForm("purchase_price"), ",", ".", -1)
 		operationCostStr := strings.Replace(c.PostForm("operation_cost"), ",", ".", -1)
 
+		tickerID, _ := strconv.Atoi(tickerIDStr)
 		shares, _ := strconv.ParseFloat(sharesStr, 64)
 		purchasePrice, _ := strconv.ParseFloat(purchasePriceStr, 64)
 		operationCost, _ := strconv.ParseFloat(operationCostStr, 64)
@@ -376,7 +522,7 @@ func main() {
 
 		// Actualizar el registro
 		db.Model(&investment).Updates(map[string]interface{}{
-			"ticker":         ticker,
+			"ticker_id":      tickerID,
 			"purchase_date":  purchaseDate,
 			"shares":         shares,
 			"purchase_price": purchasePrice,
@@ -384,7 +530,7 @@ func main() {
 		})
 
 		log.Printf("Registro de compra con ID %d actualizado", id)
-		c.Redirect(http.StatusFound, "/")
+		c.Redirect(http.StatusFound, "/compras")
 	})
 
 	// Ruta para eliminar una compra
@@ -417,72 +563,271 @@ func main() {
 }
 
 func setupDatabase() (*gorm.DB, error) {
-	database, err := gorm.Open(sqlite.Open("investments.db"), &gorm.Config{})
+	// Usar connection string directo de Supabase
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		return nil, fmt.Errorf("falta la variable de entorno DATABASE_URL")
+	}
+
+	// Agregar parámetro para desactivar prepared statements (necesario para connection pooler de Supabase)
+	if !strings.Contains(dsn, "prepared_statements") {
+		if strings.Contains(dsn, "?") {
+			dsn += "&prepare=false"
+		} else {
+			dsn += "?prepare=false"
+		}
+	}
+
+	database, err := gorm.Open(postgres.New(postgres.Config{
+		DSN:                  dsn,
+		PreferSimpleProtocol: true, // Desactiva prepared statements
+	}), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
 
-	// AutoMigrate creará las tablas basadas en los structs de Go
-	log.Println("Migrando base de datos...")
-	database.AutoMigrate(&Investment{}, &MarketData{}, &Sale{})
-
-	// Insertar datos de ejemplo si la tabla está vacía
-	var count int64
-	database.Model(&Investment{}).Count(&count)
-	if count == 0 {
-		log.Println("Insertando datos de ejemplo en la base de datos...")
-		investments := []Investment{
-			{Ticker: "AAPL", PurchaseDate: time.Date(2023, 1, 15, 0, 0, 0, 0, time.UTC), Shares: 10, PurchasePrice: 150.75, OperationCost: 5.50},
-			{Ticker: "GOOGL", PurchaseDate: time.Date(2023, 2, 20, 0, 0, 0, 0, time.UTC), Shares: 5, PurchasePrice: 2750.50, OperationCost: 12.00},
-			{Ticker: "MSFT", PurchaseDate: time.Date(2023, 3, 10, 0, 0, 0, 0, time.UTC), Shares: 8, PurchasePrice: 305.20, OperationCost: 7.25},
-			{Ticker: "AAPL", PurchaseDate: time.Date(2023, 5, 22, 0, 0, 0, 0, time.UTC), Shares: 5, PurchasePrice: 172.25, OperationCost: 5.50},
-		}
-		database.Create(&investments)
-
-		marketData := []MarketData{
-			{Ticker: "AAPL", CurrentPrice: 195.50},
-			{Ticker: "GOOGL", CurrentPrice: 2850.00},
-			{Ticker: "MSFT", CurrentPrice: 340.80},
-		}
-		for _, md := range marketData {
-			database.Save(&md) // Usamos Save para crear o actualizar
-		}
+	// Ejecutar migraciones
+	if err := runMigrations(database); err != nil {
+		return nil, fmt.Errorf("error ejecutando migraciones: %v", err)
 	}
 
 	return database, nil
 }
 
-func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, float64, float64, map[string]float64, []string, error) {
-	// 1. Obtener todos los precios de mercado de la BD
-	var marketDataItems []MarketData
-	db.Find(&marketDataItems)
+// runMigrations ejecuta todas las migraciones pendientes en orden
+func runMigrations(database *gorm.DB) error {
+	// Crear tabla de migraciones si no existe
+	database.AutoMigrate(&Migration{})
 
-	currentPrices := make(map[string]float64)
-	for _, item := range marketDataItems {
-		currentPrices[item.Ticker] = item.CurrentPrice
+	// Definir todas las migraciones disponibles
+	migrations := map[string]func(*gorm.DB) error{
+		"001_create_initial_schema":       migration001CreateInitialSchema,
+		"002_migrate_to_ticker_id_schema": migration002MigrateToTickerIDSchema,
 	}
 
-	// 2. Obtener todas las inversiones de la BD
+	// Obtener migraciones ya aplicadas
+	var appliedMigrations []Migration
+	database.Find(&appliedMigrations)
+	appliedMap := make(map[string]bool)
+	for _, m := range appliedMigrations {
+		appliedMap[m.Name] = true
+	}
+
+	// Ordenar las migraciones por nombre
+	var migrationNames []string
+	for name := range migrations {
+		migrationNames = append(migrationNames, name)
+	}
+	sort.Strings(migrationNames)
+
+	// Ejecutar migraciones pendientes
+	for _, name := range migrationNames {
+		if appliedMap[name] {
+			continue
+		}
+
+		log.Printf("Ejecutando migración: %s", name)
+		if err := migrations[name](database); err != nil {
+			return fmt.Errorf("error en migración %s: %v", name, err)
+		}
+
+		// Registrar migración como aplicada
+		database.Create(&Migration{Name: name, AppliedAt: time.Now()})
+		log.Printf("Migración completada: %s", name)
+	}
+
+	return nil
+}
+
+// migration001CreateInitialSchema crea el esquema inicial con la tabla Ticker
+func migration001CreateInitialSchema(database *gorm.DB) error {
+	// Verificar si estamos migrando desde esquema antiguo
+	hasOldSchema := database.Migrator().HasTable("market_data")
+	hasInvestments := database.Migrator().HasTable("investments")
+
+	// Crear tabla tickers si no existe
+	if !database.Migrator().HasTable("tickers") {
+		log.Println("Creando tabla tickers...")
+		if err := database.Exec(`CREATE TABLE "tickers" (
+			"id" bigserial PRIMARY KEY,
+			"created_at" timestamptz,
+			"updated_at" timestamptz,
+			"deleted_at" timestamptz,
+			"name" text,
+			"current_price" decimal
+		)`).Error; err != nil {
+			return err
+		}
+		database.Exec(`CREATE UNIQUE INDEX "idx_tickers_name" ON "tickers" ("name")`)
+		database.Exec(`CREATE INDEX "idx_tickers_deleted_at" ON "tickers" ("deleted_at")`)
+	}
+
+	if hasOldSchema && hasInvestments {
+		// Esquema antiguo existe
+		log.Println("Detectado esquema antiguo, preparando para migración...")
+
+		// Agregar columna ticker_id a investments si no existe
+		if !database.Migrator().HasColumn(&Investment{}, "ticker_id") {
+			log.Println("Agregando columna ticker_id a investments...")
+			database.Exec("ALTER TABLE investments ADD COLUMN ticker_id bigint")
+		}
+		// Agregar columna ticker_id a sales si no existe
+		if database.Migrator().HasTable("sales") && !database.Migrator().HasColumn(&Sale{}, "ticker_id") {
+			log.Println("Agregando columna ticker_id a sales...")
+			database.Exec("ALTER TABLE sales ADD COLUMN ticker_id bigint")
+		}
+		return nil
+	}
+
+	// Base de datos nueva - crear tablas investments y sales si no existen
+	if !database.Migrator().HasTable("investments") {
+		log.Println("Creando tabla investments...")
+		database.AutoMigrate(&Investment{})
+	}
+	if !database.Migrator().HasTable("sales") {
+		log.Println("Creando tabla sales...")
+		database.AutoMigrate(&Sale{})
+	}
+
+	return nil
+}
+
+// migration002MigrateToTickerIDSchema migra datos del esquema antiguo al nuevo
+func migration002MigrateToTickerIDSchema(database *gorm.DB) error {
+	// Verificar si existe la tabla market_data (esquema antiguo)
+	if !database.Migrator().HasTable("market_data") {
+		log.Println("No se encontró esquema antiguo, saltando migración de datos")
+
+		// Si no hay datos, insertar datos de ejemplo
+		var count int64
+		database.Model(&Ticker{}).Count(&count)
+		if count == 0 {
+			log.Println("Insertando datos de ejemplo...")
+			tickers := []Ticker{
+				{Name: "AAPL", CurrentPrice: 195.50},
+				{Name: "GOOGL", CurrentPrice: 2850.00},
+				{Name: "MSFT", CurrentPrice: 340.80},
+			}
+			database.Create(&tickers)
+
+			var aaplTicker, googlTicker, msftTicker Ticker
+			database.Where("name = ?", "AAPL").First(&aaplTicker)
+			database.Where("name = ?", "GOOGL").First(&googlTicker)
+			database.Where("name = ?", "MSFT").First(&msftTicker)
+
+			investments := []Investment{
+				{TickerID: aaplTicker.ID, PurchaseDate: time.Date(2023, 1, 15, 0, 0, 0, 0, time.UTC), Shares: 10, PurchasePrice: 150.75, OperationCost: 5.50},
+				{TickerID: googlTicker.ID, PurchaseDate: time.Date(2023, 2, 20, 0, 0, 0, 0, time.UTC), Shares: 5, PurchasePrice: 2750.50, OperationCost: 12.00},
+				{TickerID: msftTicker.ID, PurchaseDate: time.Date(2023, 3, 10, 0, 0, 0, 0, time.UTC), Shares: 8, PurchasePrice: 305.20, OperationCost: 7.25},
+				{TickerID: aaplTicker.ID, PurchaseDate: time.Date(2023, 5, 22, 0, 0, 0, 0, time.UTC), Shares: 5, PurchasePrice: 172.25, OperationCost: 5.50},
+			}
+			database.Create(&investments)
+		}
+		return nil
+	}
+
+	log.Println("Migrando datos del esquema antiguo...")
+
+	// 1. Migrar datos de market_data a tickers
+	type OldMarketData struct {
+		Ticker       string `gorm:"primaryKey"`
+		CurrentPrice float64
+	}
+
+	var oldMarketData []OldMarketData
+	database.Table("market_data").Find(&oldMarketData)
+
+	tickerMap := make(map[string]uint) // mapa de nombre -> ID
+
+	for _, md := range oldMarketData {
+		ticker := Ticker{Name: md.Ticker, CurrentPrice: md.CurrentPrice}
+		database.Create(&ticker)
+		tickerMap[md.Ticker] = ticker.ID
+		log.Printf("  Ticker migrado: %s (ID: %d)", md.Ticker, ticker.ID)
+	}
+
+	// 2. Verificar si hay columna 'ticker' en investments (esquema antiguo)
+	if database.Migrator().HasColumn(&Investment{}, "ticker") {
+		// Migrar investments: actualizar ticker_id basado en el nombre del ticker
+		type OldInvestment struct {
+			ID     uint
+			Ticker string
+		}
+		var oldInvestments []OldInvestment
+		database.Table("investments").Select("id, ticker").Find(&oldInvestments)
+
+		for _, oi := range oldInvestments {
+			if tickerID, ok := tickerMap[oi.Ticker]; ok {
+				database.Table("investments").Where("id = ?", oi.ID).Update("ticker_id", tickerID)
+			}
+		}
+		log.Printf("  Migradas %d inversiones", len(oldInvestments))
+
+		// Eliminar columna ticker antigua de investments
+		database.Migrator().DropColumn(&Investment{}, "ticker")
+	}
+
+	// 3. Verificar si hay columna 'ticker' en sales (esquema antiguo)
+	if database.Migrator().HasColumn(&Sale{}, "ticker") {
+		type OldSale struct {
+			ID     uint
+			Ticker string
+		}
+		var oldSales []OldSale
+		database.Table("sales").Select("id, ticker").Find(&oldSales)
+
+		for _, os := range oldSales {
+			if tickerID, ok := tickerMap[os.Ticker]; ok {
+				database.Table("sales").Where("id = ?", os.ID).Update("ticker_id", tickerID)
+			}
+		}
+		log.Printf("  Migradas %d ventas", len(oldSales))
+
+		// Eliminar columna ticker antigua de sales
+		database.Migrator().DropColumn(&Sale{}, "ticker")
+	}
+
+	// 4. Eliminar tabla market_data antigua
+	database.Migrator().DropTable("market_data")
+	log.Println("  Tabla market_data eliminada")
+
+	log.Println("Migración de datos completada")
+	return nil
+}
+
+func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, float64, float64, float64, map[uint]float64, error) {
+	// 1. Obtener todos los tickers con sus precios
+	var tickers []Ticker
+	db.Find(&tickers)
+
+	tickerPrices := make(map[uint]float64)
+	tickerNames := make(map[uint]string)
+	for _, t := range tickers {
+		tickerPrices[t.ID] = t.CurrentPrice
+		tickerNames[t.ID] = t.Name
+	}
+
+	// 2. Obtener todas las inversiones de la BD con preload del ticker
 	var investments []Investment
-	db.Order("purchase_date desc").Find(&investments)
+	db.Preload("Ticker").Order("purchase_date desc").Find(&investments)
 
 	// 3. Construir la vista detallada de inversiones y calcular totales
 	var investmentViews []InvestmentView
 	var totalCapital float64
 	var netProfitLoss float64
-
-	// Para almacenar tickers únicos
-	uniqueTickersMap := make(map[string]bool)
+	var totalOperationCost float64
 
 	for _, i := range investments {
-		currentPrice := currentPrices[i.Ticker]
+		currentPrice := tickerPrices[i.TickerID]
+		tickerName := tickerNames[i.TickerID]
 		investedCapital := i.Shares * i.PurchasePrice
 		currentValue := i.Shares * currentPrice
 		profitLoss := currentValue - (investedCapital + i.OperationCost)
 
 		view := InvestmentView{
 			ID:              i.ID,
-			Ticker:          i.Ticker,
+			TickerID:        i.TickerID,
+			Ticker:          tickerName,
 			PurchaseDate:    i.PurchaseDate.Format("02 Jan 2006"),
 			Shares:          i.Shares,
 			PurchasePrice:   i.PurchasePrice,
@@ -493,10 +838,10 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			ProfitLoss:      profitLoss,
 		}
 
-		totalCapital += investedCapital + i.OperationCost // El capital total sí debe incluir los costos
+		totalCapital += investedCapital + i.OperationCost
+		totalOperationCost += i.OperationCost
 		netProfitLoss += profitLoss
 		investmentViews = append(investmentViews, view)
-		uniqueTickersMap[i.Ticker] = true
 	}
 
 	// 4. Construir la vista de resumen por ticker
@@ -520,16 +865,18 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 		summaryViews = append(summaryViews, *summary)
 	}
 
-	// 5. Obtener todas las ventas de la BD y construir la vista detallada
+	// 5. Obtener todas las ventas de la BD con preload del ticker
 	var sales []Sale
-	db.Order("sale_date desc").Find(&sales)
+	db.Preload("Ticker").Order("sale_date desc").Find(&sales)
 
 	var saleViews []SaleView
 	for _, s := range sales {
+		tickerName := tickerNames[s.TickerID]
 		totalSaleValue := s.Shares * s.SalePrice
 		view := SaleView{
 			ID:             s.ID,
-			Ticker:         s.Ticker,
+			TickerID:       s.TickerID,
+			Ticker:         tickerName,
 			SaleDate:       s.SaleDate.Format("02 Jan 2006"),
 			Shares:         s.Shares,
 			SalePrice:      s.SalePrice,
@@ -540,11 +887,5 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 		saleViews = append(saleViews, view)
 	}
 
-	// Convertir el mapa de tickers únicos a un slice
-	var uniqueTickers []string
-	for ticker := range uniqueTickersMap {
-		uniqueTickers = append(uniqueTickers, ticker)
-	}
-
-	return investmentViews, summaryViews, saleViews, totalCapital, netProfitLoss, currentPrices, uniqueTickers, nil
+	return investmentViews, summaryViews, saleViews, totalCapital, netProfitLoss, totalOperationCost, tickerPrices, nil
 }
