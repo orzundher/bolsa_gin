@@ -13,7 +13,8 @@
 </head>
 <body class="bg-gray-50 dark:bg-gray-900">
     {{template "header.html" .}}
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="p-4 sm:ml-64">
+        <div class="p-4 mt-14 max-w-4xl">
         <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-6">Editar Registro de Compra</h1>
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
             <form action="/update/{{.Investment.ID}}" method="post">
@@ -53,6 +54,7 @@
                     <a href="/compras" class="text-gray-900 bg-white border border-gray-300 hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-gray-600 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-700 dark:focus:ring-gray-700">Cancelar</a>
                 </div>
             </form>
+            </div>
         </div>
     </div>
     
