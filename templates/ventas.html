@@ -1,9 +1,14 @@
 <!DOCTYPE html>
 <html lang="es">
+<<<<<<< HEAD
+=======
+
+>>>>>>> 0e495adf1129805aedc92ef2eaf5cf135a819e82
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mis Ventas</title>
+<<<<<<< HEAD
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <style>
@@ -11,10 +16,20 @@
         .table thead th.sortable { cursor: pointer; }
     </style>
 </head>
+=======
+    <!-- Bootstrap CSS from CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <link href="/static/css/common.css" rel="stylesheet">
+</head>
+
+>>>>>>> 0e495adf1129805aedc92ef2eaf5cf135a819e82
 <body>
     {{template "header" .}}
     
     <div class="container">
+<<<<<<< HEAD
         <h2 class="mb-4">Historial de Ventas</h2>
         
         <div class="card mb-4">
@@ -69,6 +84,70 @@
                         <th>Costo Operación</th>
                         <th>Retención</th>
                         <th>Valor Total</th>
+=======
+
+        <div class="row mb-5">
+            <div class="col-lg-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Registrar Nueva Venta</h5>
+                        <form action="/add-sale" method="post">
+                            <input type="hidden" name="redirect_to" value="/ventas">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="sale_ticker_id" class="form-label">Ticker</label>
+                                    <select name="ticker_id" id="sale_ticker_id" class="form-select" required>
+                                        <option value="">Seleccionar Ticker</option>
+                                        {{range .Tickers}}
+                                        <option value="{{.ID}}">{{.Name}}</option>
+                                        {{end}}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="sale_date" class="form-label">Fecha Venta</label>
+                                    <input type="date" name="sale_date" id="sale_date" class="form-control" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="sale_shares" class="form-label">Acciones</label>
+                                    <input type="number" step="any" name="shares" id="sale_shares" class="form-control"
+                                        required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="sale_price" class="form-label">Precio Venta</label>
+                                    <input type="number" step="any" name="sale_price" id="sale_price"
+                                        class="form-control" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="sale_operation_cost" class="form-label">Costo Operación</label>
+                                    <input type="number" step="any" name="operation_cost" id="sale_operation_cost"
+                                        class="form-control" placeholder="0.00">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="sale_withheld_tax" class="form-label">Impuesto Retenido</label>
+                                    <input type="number" step="any" name="withheld_tax" id="sale_withheld_tax"
+                                        class="form-control" placeholder="0.00">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-success mt-3">Registrar Venta</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="mb-3">Historial de Ventas</h2>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-sm" id="salesTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="sortable">Ticker</th>
+                        <th class="sortable">Fecha Venta</th>
+                        <th class="sortable">Acciones</th>
+                        <th class="sortable">Precio Venta</th>
+                        <th class="sortable">Costo Operación</th>
+                        <th class="sortable">Impuesto Retenido</th>
+                        <th class="sortable">Valor Total Venta</th>
+>>>>>>> 0e495adf1129805aedc92ef2eaf5cf135a819e82
                         <th>Acciones</th>
                     </tr>
                 </thead>
@@ -83,7 +162,13 @@
                         <td>{{printf "%.2f€" .WithheldTax}}</td>
                         <td>{{printf "%.2f€" .TotalSaleValue}}</td>
                         <td>
+<<<<<<< HEAD
                             <form action="/delete-sale" method="post" onsubmit="return confirm('¿Estás seguro?');" style="display: inline;">
+=======
+                            <form action="/delete-sale" method="post"
+                                onsubmit="return confirm('¿Estás seguro de que quieres eliminar esta venta?');"
+                                style="display: inline;">
+>>>>>>> 0e495adf1129805aedc92ef2eaf5cf135a819e82
                                 <input type="hidden" name="id" value="{{.ID}}">
                                 <input type="hidden" name="redirect_to" value="/ventas">
                                 <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
@@ -94,6 +179,17 @@
                 </tbody>
             </table>
         </div>
+<<<<<<< HEAD
     </div>
 </body>
+=======
+
+    </div>
+
+    <script src="/static/js/table-sort.js"></script>
+    <script src="/static/js/ventas.js"></script>
+
+</body>
+
+>>>>>>> 0e495adf1129805aedc92ef2eaf5cf135a819e82
 </html>

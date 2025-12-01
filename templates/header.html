@@ -1,4 +1,5 @@
 {{define "header"}}
+<<<<<<< HEAD
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
     <div class="container">
         <a class="navbar-brand" href="/">💰 Bolsa Gin</a>
@@ -23,4 +24,60 @@
         </div>
     </div>
 </nav>
+=======
+<header>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary" style="padding: 0.3rem 1rem; min-height: auto;">
+        <div class="container-fluid" style="padding: 0;">
+            <a class="navbar-brand" href="/" style="font-size: 1.1rem; font-weight: 600; margin-right: 2rem;">INVESTMENT TRACKER</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link {{if eq .ActivePage "home"}}active-page{{end}}" href="/">Inicio</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{if eq .ActivePage "compras"}}active-page{{end}}" href="/compras">Compras</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{if eq .ActivePage "ventas"}}active-page{{end}}" href="/ventas">Ventas</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{if eq .ActivePage "precios"}}active-page{{end}}" href="/precios">Precios</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item d-flex align-items-center">
+                        <span class="text-light me-2" style="font-size: 0.85rem;">Dark Mode</span>
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="darkModeToggle" onchange="toggleDarkMode()" style="cursor: pointer;">
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+</header>
+<script>
+    function toggleDarkMode() {
+        const body = document.body;
+        const toggle = document.getElementById('darkModeToggle');
+        const isDark = toggle.checked;
+        body.classList.toggle('dark-mode', isDark);
+        localStorage.setItem('darkMode', isDark ? 'enabled' : 'disabled');
+    }
+
+    // Aplicar preferencia guardada al cargar
+    (function() {
+        const savedMode = localStorage.getItem('darkMode');
+        const toggle = document.getElementById('darkModeToggle');
+        if (savedMode === 'enabled') {
+            document.body.classList.add('dark-mode');
+            if (toggle) toggle.checked = true;
+        }
+    })();
+</script>
+>>>>>>> 0e495adf1129805aedc92ef2eaf5cf135a819e82
 {{end}}
