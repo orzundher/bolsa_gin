@@ -29,13 +29,13 @@
             </div>
 
             <!-- Resumen -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8">
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
                     <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Precio Actual</h4>
                     <h3 class="text-xl font-bold text-blue-600 dark:text-blue-400">{{printf "%.4f€" .Ticker.CurrentPrice}}</h3>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Total Invertido</h4>
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Total Comprado</h4>
                     <h3 class="text-xl font-bold text-gray-900 dark:text-white">{{printf "%.3f€" .TotalInvested}}</h3>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
@@ -45,6 +45,26 @@
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
                     <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Costos Totales</h4>
                     <h3 class="text-xl font-bold text-red-600 dark:text-red-400">{{printf "%.3f€" .TotalCosts}}</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">En Cartera</h4>
+                    <h3 class="text-xl font-bold text-blue-600 dark:text-blue-400">{{printf "%.6f" .SharesInPortfolio}}</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Precio Ponderado</h4>
+                    <h3 class="text-xl font-bold text-purple-600 dark:text-purple-400">{{printf "%.4f€" .PortfolioWAC}}</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Rendimiento</h4>
+                    <h3 class="text-xl font-bold {{if ge .WACPerformance 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">{{if ge .WACPerformance 0.0}}+{{end}}{{printf "%.2f" .WACPerformance}}%</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Utilidad Posible</h4>
+                    <h3 class="text-xl font-bold {{if ge .Utilidad 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">{{if ge .Utilidad 0.0}}+{{end}}{{printf "%.2f€" .Utilidad}}</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Utilidad Ventas</h4>
+                    <h3 class="text-xl font-bold {{if ge .TotalSaleUtility 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">{{if ge .TotalSaleUtility 0.0}}+{{end}}{{printf "%.2f€" .TotalSaleUtility}}</h3>
                 </div>
             </div>
 
@@ -110,6 +130,8 @@
                                 <th scope="col" class="px-4 py-3">Costo Op.</th>
                                 <th scope="col" class="px-4 py-3">Impuesto Retenido</th>
                                 <th scope="col" class="px-4 py-3">Total Venta</th>
+                                <th scope="col" class="px-4 py-3">Rendimiento</th>
+                                <th scope="col" class="px-4 py-3">Utilidad</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -121,10 +143,16 @@
                                 <td class="px-4 py-3">{{printf "%.3f€" .OperationCost}}</td>
                                 <td class="px-4 py-3">{{printf "%.3f€" .WithheldTax}}</td>
                                 <td class="px-4 py-3 font-semibold">{{printf "%.3f€" .TotalSaleValue}}</td>
+                                <td class="px-4 py-3 {{if ge .SalePerformance 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}} font-semibold">
+                                    {{if ge .SalePerformance 0.0}}+{{end}}{{printf "%.2f%%" .SalePerformance}}
+                                </td>
+                                <td class="px-4 py-3 {{if ge .SaleUtility 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}} font-semibold">
+                                    {{if ge .SaleUtility 0.0}}+{{end}}{{printf "%.2f€" .SaleUtility}}
+                                </td>
                             </tr>
                             {{else}}
                             <tr>
-                                <td colspan="6" class="px-4 py-3 text-center text-gray-500 dark:text-gray-400">No hay ventas registradas</td>
+                                <td colspan="8" class="px-4 py-3 text-center text-gray-500 dark:text-gray-400">No hay ventas registradas</td>
                             </tr>
                             {{end}}
                         </tbody>

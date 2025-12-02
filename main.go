@@ -93,17 +93,23 @@ type TickerSummaryView struct {
 
 // SaleView representa los datos de venta que se mostrarán en la página.
 type SaleView struct {
-	ID             uint
-	TickerID       uint
-	Ticker         string
-	SaleDate       string
-	Shares         float64
-	SalePrice      float64
-	OperationCost  float64
-	WithheldTax    float64
-	TotalSaleValue float64
-	Performance    float64
-	Profit         float64
+	ID              uint
+	TickerID        uint
+	Ticker          string
+	SaleDate        string
+	Shares          float64
+	SalePrice       float64
+	OperationCost   float64
+	WithheldTax     float64
+	TotalSaleValue  float64
+	CurrentPrice    float64
+	CurrentValue    float64
+	Performance     float64
+	Profit          float64
+	Projection      float64
+	WACAtSale       float64
+	SalePerformance float64
+	SaleUtility     float64
 }
 
 var db *gorm.DB
@@ -128,25 +134,39 @@ func main() {
 
 	// Ruta principal para mostrar los datos
 	router.GET("/", func(c *gin.Context) {
-		investments, summaries, _, totalCapital, netProfitLoss, totalOperationCost, _, err := getInvestmentData()
+		investments, summaries, sales, totalCapital, netProfitLoss, totalOperationCost, _, portfolioPerformance, portfolioUtility, numPositions, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
 		}
 
+		// Calcular utilidad neta de ventas
+		totalSaleUtility := 0.0
+		for _, s := range sales {
+			totalSaleUtility += s.SaleUtility
+		}
+
+		// Calcular Valor de Salida: Utilidad Ventas + Utilidad Cartera - Costos de Operación - Número de Posiciones
+		exitValue := totalSaleUtility + portfolioUtility - totalOperationCost - float64(numPositions)
+
 		c.HTML(http.StatusOK, "index.html", gin.H{
-			"Investments":        investments,
-			"Summaries":          summaries,
-			"TotalCapital":       totalCapital,
-			"NetProfitLoss":      netProfitLoss,
-			"TotalOperationCost": totalOperationCost,
-			"ActivePage":         "home",
+			"Investments":          investments,
+			"Summaries":            summaries,
+			"TotalCapital":         totalCapital,
+			"NetProfitLoss":        netProfitLoss,
+			"TotalOperationCost":   totalOperationCost,
+			"TotalSaleUtility":     totalSaleUtility,
+			"PortfolioPerformance": portfolioPerformance,
+			"PortfolioUtility":     portfolioUtility,
+			"NumPositions":         numPositions,
+			"ExitValue":            exitValue,
+			"ActivePage":           "home",
 		})
 	})
 
 	// Ruta para mostrar la página de resumen
 	router.GET("/resumen", func(c *gin.Context) {
-		_, summaries, _, _, _, _, _, err := getInvestmentData()
+		_, summaries, _, _, _, _, _, _, _, _, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
@@ -160,7 +180,7 @@ func main() {
 
 	// Ruta para mostrar la página de compras
 	router.GET("/compras", func(c *gin.Context) {
-		investments, _, _, _, _, _, _, err := getInvestmentData()
+		investments, _, _, _, _, _, _, _, _, _, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
@@ -183,7 +203,7 @@ func main() {
 
 	// Ruta para mostrar la página de ventas
 	router.GET("/ventas", func(c *gin.Context) {
-		_, _, sales, _, _, _, _, err := getInvestmentData()
+		_, _, sales, _, _, _, _, _, _, _, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
@@ -357,10 +377,14 @@ func main() {
 			operationCost = 0 // Default to 0 if empty or invalid
 		}
 
-		purchaseDate, err := time.Parse("2006-01-02", purchaseDateStr)
+		purchaseDate, err := time.Parse("2006-01-02T15:04", purchaseDateStr)
 		if err != nil {
-			c.String(http.StatusBadRequest, "Formato de fecha inválido.")
-			return
+			// Intentar formato sin hora para compatibilidad
+			purchaseDate, err = time.Parse("2006-01-02", purchaseDateStr)
+			if err != nil {
+				c.String(http.StatusBadRequest, "Formato de fecha inválido.")
+				return
+			}
 		}
 
 		// Verificar que el ticker existe
@@ -432,10 +456,14 @@ func main() {
 			withheldTax = 0 // Default to 0 if empty or invalid
 		}
 
-		saleDate, err := time.Parse("02/01/2006", saleDateStr)
+		saleDate, err := time.Parse("2006-01-02T15:04", saleDateStr)
 		if err != nil {
-			c.String(http.StatusBadRequest, "Formato de fecha inválido. Use DD/MM/YYYY")
-			return
+			// Intentar formato DD/MM/YYYY para compatibilidad
+			saleDate, err = time.Parse("02/01/2006", saleDateStr)
+			if err != nil {
+				c.String(http.StatusBadRequest, "Formato de fecha inválido.")
+				return
+			}
 		}
 
 		// Verificar que el ticker existe
@@ -512,7 +540,10 @@ func main() {
 		salePrice, _ := strconv.ParseFloat(salePriceStr, 64)
 		operationCost, _ := strconv.ParseFloat(operationCostStr, 64)
 		withheldTax, _ := strconv.ParseFloat(withheldTaxStr, 64)
-		saleDate, _ := time.Parse("02/01/2006", saleDateStr)
+		saleDate, err := time.Parse("2006-01-02T15:04", saleDateStr)
+		if err != nil {
+			saleDate, _ = time.Parse("02/01/2006", saleDateStr)
+		}
 
 		// Actualizar el registro
 		db.Model(&sale).Updates(map[string]interface{}{
@@ -613,7 +644,7 @@ func main() {
 		var purchasesList []PurchaseInfo
 		for _, inv := range investments {
 			purchasesList = append(purchasesList, PurchaseInfo{
-				Date:   inv.PurchaseDate.Format("02 Jan 2006"),
+				Date:   inv.PurchaseDate.Format("02 Jan 2006 15:04"),
 				Shares: inv.Shares,
 				Price:  inv.PurchasePrice,
 				Total:  inv.Shares * inv.PurchasePrice,
@@ -625,7 +656,7 @@ func main() {
 
 		c.JSON(http.StatusOK, gin.H{
 			"ticker":        sale.Ticker.Name,
-			"sale_date":     sale.SaleDate.Format("02 Jan 2006"),
+			"sale_date":     sale.SaleDate.Format("02 Jan 2006 15:04"),
 			"shares":        sale.Shares,
 			"sale_price":    sale.SalePrice,
 			"purchases":     purchasesList,
@@ -692,7 +723,10 @@ func main() {
 		shares, _ := strconv.ParseFloat(sharesStr, 64)
 		purchasePrice, _ := strconv.ParseFloat(purchasePriceStr, 64)
 		operationCost, _ := strconv.ParseFloat(operationCostStr, 64)
-		purchaseDate, _ := time.Parse("2006-01-02", purchaseDateStr)
+		purchaseDate, err := time.Parse("2006-01-02T15:04", purchaseDateStr)
+		if err != nil {
+			purchaseDate, _ = time.Parse("2006-01-02", purchaseDateStr)
+		}
 
 		// Actualizar el registro
 		db.Model(&investment).Updates(map[string]interface{}{
@@ -736,7 +770,10 @@ func main() {
 			return
 		}
 
-		purchaseDate, _ := time.Parse("2006-01-02", input.PurchaseDate)
+		purchaseDate, err := time.Parse("2006-01-02T15:04", input.PurchaseDate)
+		if err != nil {
+			purchaseDate, _ = time.Parse("2006-01-02", input.PurchaseDate)
+		}
 
 		// Actualizar el registro
 		db.Model(&investment).Updates(map[string]interface{}{
@@ -760,7 +797,7 @@ func main() {
 			"id":               id,
 			"ticker_id":        input.TickerID,
 			"ticker":           ticker.Name,
-			"purchase_date":    purchaseDate.Format("02 Jan 2006"),
+			"purchase_date":    purchaseDate.Format("02 Jan 2006 15:04"),
 			"shares":           input.Shares,
 			"purchase_price":   input.PurchasePrice,
 			"operation_cost":   input.OperationCost,
@@ -790,7 +827,7 @@ func main() {
 			"id":             investment.ID,
 			"ticker_id":      investment.TickerID,
 			"ticker":         investment.Ticker.Name,
-			"purchase_date":  investment.PurchaseDate.Format("2006-01-02"),
+			"purchase_date":  investment.PurchaseDate.Format("2006-01-02T15:04"),
 			"shares":         investment.Shares,
 			"purchase_price": investment.PurchasePrice,
 			"operation_cost": investment.OperationCost,
@@ -827,7 +864,10 @@ func main() {
 			return
 		}
 
-		saleDate, _ := time.Parse("2006-01-02", input.SaleDate)
+		saleDate, err := time.Parse("2006-01-02T15:04", input.SaleDate)
+		if err != nil {
+			saleDate, _ = time.Parse("2006-01-02", input.SaleDate)
+		}
 
 		// Actualizar el registro
 		db.Model(&sale).Updates(map[string]interface{}{
@@ -908,7 +948,7 @@ func main() {
 			"id":               id,
 			"ticker_id":        input.TickerID,
 			"ticker":           ticker.Name,
-			"sale_date":        saleDate.Format("02 Jan 2006"),
+			"sale_date":        saleDate.Format("02 Jan 2006 15:04"),
 			"shares":           input.Shares,
 			"sale_price":       input.SalePrice,
 			"operation_cost":   input.OperationCost,
@@ -938,7 +978,7 @@ func main() {
 			"id":             sale.ID,
 			"ticker_id":      sale.TickerID,
 			"ticker":         sale.Ticker.Name,
-			"sale_date":      sale.SaleDate.Format("2006-01-02"),
+			"sale_date":      sale.SaleDate.Format("2006-01-02T15:04"),
 			"shares":         sale.Shares,
 			"sale_price":     sale.SalePrice,
 			"operation_cost": sale.OperationCost,
@@ -1003,7 +1043,7 @@ func main() {
 				ID:              i.ID,
 				TickerID:        i.TickerID,
 				Ticker:          ticker.Name,
-				PurchaseDate:    i.PurchaseDate.Format("02 Jan 2006"),
+				PurchaseDate:    i.PurchaseDate.Format("02 Jan 2006 15:04"),
 				Shares:          i.Shares,
 				PurchasePrice:   i.PurchasePrice,
 				OperationCost:   i.OperationCost,
@@ -1022,37 +1062,131 @@ func main() {
 		var sales []Sale
 		db.Where("ticker_id = ?", tickerID).Order("sale_date desc").Find(&sales)
 
+		// Calcular WAC (Weighted Average Cost) para cada venta
+		// Crear eventos ordenados cronológicamente
+		type Event struct {
+			Date   time.Time
+			Type   string // "buy", "sell"
+			Shares float64
+			Price  float64
+			SaleID uint // Para identificar la venta
+		}
+
+		var events []Event
+		for _, i := range investments {
+			events = append(events, Event{
+				Date:   i.PurchaseDate,
+				Type:   "buy",
+				Shares: i.Shares,
+				Price:  i.PurchasePrice,
+			})
+		}
+		for _, s := range sales {
+			events = append(events, Event{
+				Date:   s.SaleDate,
+				Type:   "sell",
+				Shares: s.Shares,
+				Price:  s.SalePrice,
+				SaleID: s.ID,
+			})
+		}
+
+		// Ordenar eventos por fecha
+		sort.Slice(events, func(i, j int) bool {
+			if events[i].Date.Equal(events[j].Date) {
+				// Si la fecha es igual, procesar compras antes que ventas
+				return events[i].Type == "buy"
+			}
+			return events[i].Date.Before(events[j].Date)
+		})
+
+		// Mapa para guardar el WAC al momento de cada venta
+		saleWACMap := make(map[uint]float64)
+
+		currentShares := 0.0
+		currentCapital := 0.0
+
+		for _, e := range events {
+			if e.Type == "buy" {
+				currentShares += e.Shares
+				currentCapital += e.Shares * e.Price
+			} else if e.Type == "sell" {
+				wac := 0.0
+				if currentShares > 0 {
+					wac = currentCapital / currentShares
+				}
+				// Guardar el WAC para esta venta
+				saleWACMap[e.SaleID] = wac
+				// Reducir capital proporcionalmente al WAC
+				currentCapital -= e.Shares * wac
+				currentShares -= e.Shares
+			}
+		}
+
+		// WAC final de las acciones en cartera
+		portfolioWAC := 0.0
+		if currentShares > 0 {
+			portfolioWAC = currentCapital / currentShares
+		}
+
+		// Construir saleViews con el WAC calculado
 		var saleViews []SaleView
 		var totalSold float64
 		var totalCostSell float64
+		var totalSaleUtility float64
 		for _, s := range sales {
 			totalSaleValue := s.Shares * s.SalePrice
+			wacAtSale := saleWACMap[s.ID]
+			salePerformance := 0.0
+			if wacAtSale > 0 {
+				salePerformance = ((s.SalePrice - wacAtSale) / wacAtSale) * 100
+			}
+			saleUtility := (s.SalePrice - wacAtSale) * s.Shares
+
 			view := SaleView{
-				ID:             s.ID,
-				TickerID:       s.TickerID,
-				Ticker:         ticker.Name,
-				SaleDate:       s.SaleDate.Format("02 Jan 2006"),
-				Shares:         s.Shares,
-				SalePrice:      s.SalePrice,
-				OperationCost:  s.OperationCost,
-				WithheldTax:    s.WithheldTax,
-				TotalSaleValue: totalSaleValue,
+				ID:              s.ID,
+				TickerID:        s.TickerID,
+				Ticker:          ticker.Name,
+				SaleDate:        s.SaleDate.Format("02 Jan 2006 15:04"),
+				Shares:          s.Shares,
+				SalePrice:       s.SalePrice,
+				OperationCost:   s.OperationCost,
+				WithheldTax:     s.WithheldTax,
+				TotalSaleValue:  totalSaleValue,
+				WACAtSale:       wacAtSale,
+				SalePerformance: salePerformance,
+				SaleUtility:     saleUtility,
 			}
 			saleViews = append(saleViews, view)
 			totalSold += totalSaleValue
 			totalCostSell += s.OperationCost
+			totalSaleUtility += saleUtility
 		}
 
+		// Rendimiento porcentual vs precio ponderado
+		wacPerformance := 0.0
+		if portfolioWAC > 0 {
+			wacPerformance = ((ticker.CurrentPrice - portfolioWAC) / portfolioWAC) * 100
+		}
+
+		// Utilidad: diferencia entre valor actual y valor ponderado del portafolio
+		utilidad := (ticker.CurrentPrice * currentShares) - (portfolioWAC * currentShares)
+
 		c.HTML(http.StatusOK, "ticker_detail.html", gin.H{
-			"Ticker":        ticker,
-			"Investments":   investmentViews,
-			"Sales":         saleViews,
-			"TotalInvested": totalInvested,
-			"TotalCostBuy":  totalCostBuy,
-			"TotalSold":     totalSold,
-			"TotalCostSell": totalCostSell,
-			"TotalCosts":    totalCostBuy + totalCostSell,
-			"ActivePage":    "resumen",
+			"Ticker":            ticker,
+			"Investments":       investmentViews,
+			"Sales":             saleViews,
+			"TotalInvested":     totalInvested,
+			"TotalCostBuy":      totalCostBuy,
+			"TotalSold":         totalSold,
+			"TotalCostSell":     totalCostSell,
+			"TotalCosts":        totalCostBuy + totalCostSell,
+			"SharesInPortfolio": currentShares,
+			"PortfolioWAC":      portfolioWAC,
+			"WACPerformance":    wacPerformance,
+			"Utilidad":          utilidad,
+			"TotalSaleUtility":  totalSaleUtility,
+			"ActivePage":        "resumen",
 		})
 	})
 
@@ -1297,7 +1431,7 @@ func migration002MigrateToTickerIDSchema(database *gorm.DB) error {
 	return nil
 }
 
-func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, float64, float64, float64, map[uint]float64, error) {
+func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, float64, float64, float64, map[uint]float64, float64, float64, int, error) {
 	// 1. Obtener todos los tickers con sus precios
 	var tickers []Ticker
 	db.Find(&tickers)
@@ -1334,7 +1468,7 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			ID:              i.ID,
 			TickerID:        i.TickerID,
 			Ticker:          tickerName,
-			PurchaseDate:    i.PurchaseDate.Format("02 Jan 2006"),
+			PurchaseDate:    i.PurchaseDate.Format("02 Jan 2006 15:04"),
 			Shares:          i.Shares,
 			PurchasePrice:   i.PurchasePrice,
 			OperationCost:   i.OperationCost,
@@ -1388,6 +1522,11 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 		summaryViews = append(summaryViews, *summary)
 	}
 
+	// Ordenar summaryViews por nombre del ticker
+	sort.Slice(summaryViews, func(i, j int) bool {
+		return summaryViews[i].Ticker < summaryViews[j].Ticker
+	})
+
 	// Calcular WAC (Weighted Average Cost) histórico para cada venta
 	type Event struct {
 		Date   time.Time
@@ -1421,8 +1560,12 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 	}
 
 	saleWACs := make(map[uint]float64)
+	tickerFinalState := make(map[uint]struct {
+		Shares  float64
+		Capital float64
+	})
 
-	for _, events := range tickerEvents {
+	for tickerID, events := range tickerEvents {
 		// Ordenar eventos por fecha
 		sort.Slice(events, func(i, j int) bool {
 			if events[i].Date.Equal(events[j].Date) {
@@ -1451,36 +1594,83 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 				currentShares -= e.Shares
 			}
 		}
+		// Guardar estado final del ticker
+		tickerFinalState[tickerID] = struct {
+			Shares  float64
+			Capital float64
+		}{currentShares, currentCapital}
+	}
+
+	// Calcular rendimiento del portafolio completo
+	totalPortfolioCurrentValue := 0.0
+	totalPortfolioWACValue := 0.0
+	for tickerID, state := range tickerFinalState {
+		if state.Shares > 0 {
+			currentPrice := tickerPrices[tickerID]
+			totalPortfolioCurrentValue += state.Shares * currentPrice
+			totalPortfolioWACValue += state.Capital // Capital ya es shares * WAC
+		}
+	}
+	portfolioPerformance := 0.0
+	if totalPortfolioWACValue > 0 {
+		portfolioPerformance = ((totalPortfolioCurrentValue - totalPortfolioWACValue) / totalPortfolioWACValue) * 100
+	}
+	portfolioUtility := totalPortfolioCurrentValue - totalPortfolioWACValue
+
+	// Contar número de posiciones (tickers con acciones > 0)
+	numPositions := 0
+	for _, state := range tickerFinalState {
+		if state.Shares > 0 {
+			numPositions++
+		}
 	}
 
 	var saleViews []SaleView
 	for _, s := range sales {
 		tickerName := tickerNames[s.TickerID]
+		currentPrice := tickerPrices[s.TickerID]
 		totalSaleValue := s.Shares * s.SalePrice
+		currentValue := s.Shares * currentPrice
 
 		wac := saleWACs[s.ID]
 		// Utilidad calculada solo con precios, sin costos de operación ni impuestos
 		profit := (s.SalePrice - wac) * s.Shares
 		performance := 0.0
-		if wac > 0 {
-			performance = (s.SalePrice - wac) / wac * 100
+		if s.SalePrice > 0 {
+			performance = (currentPrice - s.SalePrice) / s.SalePrice * 100
 		}
+		// Proyección: diferencia entre monto actual y monto de venta
+		projection := currentValue - totalSaleValue
+
+		// Rendimiento de la venta vs WAC
+		salePerformance := 0.0
+		if wac > 0 {
+			salePerformance = ((s.SalePrice - wac) / wac) * 100
+		}
+		// Utilidad de la venta
+		saleUtility := (s.SalePrice - wac) * s.Shares
 
 		view := SaleView{
-			ID:             s.ID,
-			TickerID:       s.TickerID,
-			Ticker:         tickerName,
-			SaleDate:       s.SaleDate.Format("02 Jan 2006"),
-			Shares:         s.Shares,
-			SalePrice:      s.SalePrice,
-			OperationCost:  s.OperationCost,
-			WithheldTax:    s.WithheldTax,
-			TotalSaleValue: totalSaleValue,
-			Performance:    performance,
-			Profit:         profit,
+			ID:              s.ID,
+			TickerID:        s.TickerID,
+			Ticker:          tickerName,
+			SaleDate:        s.SaleDate.Format("02 Jan 2006 15:04"),
+			Shares:          s.Shares,
+			SalePrice:       s.SalePrice,
+			OperationCost:   s.OperationCost,
+			WithheldTax:     s.WithheldTax,
+			TotalSaleValue:  totalSaleValue,
+			CurrentPrice:    currentPrice,
+			CurrentValue:    currentValue,
+			Performance:     performance,
+			Profit:          profit,
+			Projection:      projection,
+			WACAtSale:       wac,
+			SalePerformance: salePerformance,
+			SaleUtility:     saleUtility,
 		}
 		saleViews = append(saleViews, view)
 	}
 
-	return investmentViews, summaryViews, saleViews, totalCapital, netProfitLoss, totalOperationCost, tickerPrices, nil
+	return investmentViews, summaryViews, saleViews, totalCapital, netProfitLoss, totalOperationCost, tickerPrices, portfolioPerformance, portfolioUtility, numPositions, nil
 }

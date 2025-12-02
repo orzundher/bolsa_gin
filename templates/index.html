@@ -19,24 +19,48 @@
         <div class="p-4 mt-14">
 
         <!-- Metrics Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <!-- Volumen de Cartera -->
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-6 mb-8">
+            <!-- Número de Posiciones -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Volumen de Cartera</h4>
-                <h3 class="text-3xl font-bold text-blue-600 dark:text-blue-400">{{printf "%.3f€" .TotalCapital}}</h3>
+                <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Posiciones</h4>
+                <h3 class="text-3xl font-bold text-blue-600 dark:text-blue-400">{{.NumPositions}}</h3>
             </div>
-            
+
             <!-- Costos de Operación -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                 <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Costos de Operación</h4>
                 <h3 class="text-3xl font-bold text-gray-600 dark:text-gray-300">{{printf "%.3f€" .TotalOperationCost}}</h3>
             </div>
-            
-            <!-- Utilidad Neta Actual -->
+
+            <!-- Utilidad Ventas -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Utilidad Neta Actual</h4>
-                <h3 class="text-3xl font-bold {{if gt .NetProfitLoss 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
-                    {{printf "%.3f€" .NetProfitLoss}}
+                <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Utilidad Ventas</h4>
+                <h3 class="text-3xl font-bold {{if ge .TotalSaleUtility 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
+                    {{if ge .TotalSaleUtility 0.0}}+{{end}}{{printf "%.2f€" .TotalSaleUtility}}
+                </h3>
+            </div>
+
+            <!-- Rendimiento Cartera -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Rendimiento Cartera</h4>
+                <h3 class="text-3xl font-bold {{if ge .PortfolioPerformance 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
+                    {{if ge .PortfolioPerformance 0.0}}+{{end}}{{printf "%.2f%%" .PortfolioPerformance}}
+                </h3>
+            </div>
+
+            <!-- Utilidad Cartera -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Utilidad Cartera</h4>
+                <h3 class="text-3xl font-bold {{if ge .PortfolioUtility 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
+                    {{if ge .PortfolioUtility 0.0}}+{{end}}{{printf "%.2f€" .PortfolioUtility}}
+                </h3>
+            </div>
+
+            <!-- Valor de Salida -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Valor de Salida</h4>
+                <h3 class="text-3xl font-bold {{if ge .ExitValue 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
+                    {{if ge .ExitValue 0.0}}+{{end}}{{printf "%.2f€" .ExitValue}}
                 </h3>
             </div>
         </div>
