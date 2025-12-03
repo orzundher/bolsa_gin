@@ -166,6 +166,21 @@
     <!-- Flowbite JS -->
     <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
 
+    <script>
+        // Volver a resumen con la tecla ESC
+        // Usar keyup y DOMContentLoaded para asegurar que funcione correctamente
+        document.addEventListener('DOMContentLoaded', function() {
+            document.addEventListener('keyup', function(event) {
+                if (event.key === 'Escape' || event.keyCode === 27) {
+                    // Prevenir comportamiento por defecto
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.location.href = '/resumen';
+                }
+            }, true); // true = capture phase, se ejecuta antes que otros listeners
+        });
+    </script>
+
 </body>
 
 </html>

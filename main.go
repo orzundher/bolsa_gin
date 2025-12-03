@@ -62,6 +62,7 @@ type TickerView struct {
 	ID           uint
 	Name         string
 	CurrentPrice float64
+	UpdatedAt    string
 }
 
 // InvestmentView representa los datos de inversión que se mostrarán en la página.
@@ -235,6 +236,7 @@ func main() {
 				ID:           t.ID,
 				Name:         t.Name,
 				CurrentPrice: t.CurrentPrice,
+				UpdatedAt:    t.UpdatedAt.Format("02 Jan 2006 15:04"),
 			})
 		}
 
@@ -1505,18 +1507,6 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 	var sales []Sale
 	db.Preload("Ticker").Order("sale_date desc").Find(&sales)
 
-	// Restar las acciones vendidas del resumen y ajustar valores
-	for _, s := range sales {
-		if summary, ok := summaries[s.TickerID]; ok {
-			summary.TotalShares -= s.Shares
-			// Ajustar el valor actual basado en las acciones restantes
-			currentPrice := tickerPrices[s.TickerID]
-			summary.CurrentValue = summary.TotalShares * currentPrice
-			// Recalcular la utilidad
-			summary.ProfitLoss = summary.CurrentValue - (summary.InvestedCapital + summary.TotalCost)
-		}
-	}
-
 	var summaryViews []TickerSummaryView
 	for _, summary := range summaries {
 		summaryViews = append(summaryViews, *summary)
@@ -1616,6 +1606,27 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 		portfolioPerformance = ((totalPortfolioCurrentValue - totalPortfolioWACValue) / totalPortfolioWACValue) * 100
 	}
 	portfolioUtility := totalPortfolioCurrentValue - totalPortfolioWACValue
+
+	// Actualizar summaries con el cálculo correcto basado en WAC
+	for i := range summaryViews {
+		tickerID := summaryViews[i].TickerID
+		if state, ok := tickerFinalState[tickerID]; ok && state.Shares > 0 {
+			currentPrice := tickerPrices[tickerID]
+			wac := 0.0
+			if state.Shares > 0 {
+				wac = state.Capital / state.Shares
+			}
+			// Utilidad = (Precio Actual * Acciones) - (WAC * Acciones)
+			summaryViews[i].TotalShares = state.Shares
+			summaryViews[i].CurrentValue = state.Shares * currentPrice
+			summaryViews[i].ProfitLoss = (currentPrice * state.Shares) - (wac * state.Shares)
+		} else {
+			// Si no hay acciones en cartera, poner todo en 0
+			summaryViews[i].TotalShares = 0
+			summaryViews[i].CurrentValue = 0
+			summaryViews[i].ProfitLoss = 0
+		}
+	}
 
 	// Contar número de posiciones (tickers con acciones > 0)
 	numPositions := 0

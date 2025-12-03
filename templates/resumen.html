@@ -18,38 +18,36 @@
     <div class="p-4 sm:ml-64">
         <div class="p-4 mt-14">
 
+        <!-- Toggle para mostrar/ocultar tickers con pocas acciones -->
+        <div class="mb-4 flex items-center">
+            <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="showEmptyTickers" class="sr-only peer">
+                <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Mostrar tickers con menos de 0.000001 acciones</span>
+            </label>
+        </div>
+
         <!-- Summary Table -->
         <div class="relative overflow-x-auto shadow-md sm:rounded-lg mb-8">
             <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400" id="summaryTable">
                 <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                     <tr>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Ticker</th>
-                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Acciones</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Capital Invertido</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Costos Totales</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Valor Actual</th>
-                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Utilidad (+/-)</th>
-                        <th scope="col" class="px-6 py-3">Detalle</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Posición</th>
                     </tr>
                 </thead>
                 <tbody>
                     {{range .Summaries}}
-                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 {{if gt .ProfitLoss 0.0}}bg-green-50 dark:bg-green-900/20{{else if lt .ProfitLoss 0.0}}bg-red-50 dark:bg-red-900/20{{end}}">
+                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer {{if gt .ProfitLoss 0.0}}bg-green-50 dark:bg-green-900/20{{else if lt .ProfitLoss 0.0}}bg-red-50 dark:bg-red-900/20{{end}}" data-shares="{{.TotalShares}}" onclick="window.location.href='/ticker/{{.TickerID}}'">
                         <th scope="row" class="px-6 py-4 font-bold text-gray-900 dark:text-white whitespace-nowrap">{{.Ticker}}</th>
-                        <td class="px-6 py-4">{{printf "%.6f" .TotalShares}}</td>
                         <td class="px-6 py-4">{{printf "%.3f€" .InvestedCapital}}</td>
                         <td class="px-6 py-4">{{printf "%.3f€" .TotalCost}}</td>
                         <td class="px-6 py-4">{{printf "%.3f€" .CurrentValue}}</td>
                         <td class="px-6 py-4 font-bold {{if gt .ProfitLoss 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
                             {{printf "%.3f€" .ProfitLoss}}
-                        </td>
-                        <td class="px-6 py-4">
-                            <a href="/ticker/{{.TickerID}}" onclick="sessionStorage.setItem('resumenScrollPosition', window.scrollY)" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300" title="Ver detalle">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                </svg>
-                            </a>
                         </td>
                     </tr>
                     {{end}}
@@ -73,6 +71,29 @@
                 sessionStorage.removeItem('resumenScrollPosition');
             }
         });
+
+        // Función para filtrar tickers con pocas acciones
+        function filterEmptyTickers() {
+            const showEmpty = document.getElementById('showEmptyTickers').checked;
+            const rows = document.querySelectorAll('#summaryTable tbody tr');
+            
+            rows.forEach(row => {
+                const shares = parseFloat(row.getAttribute('data-shares'));
+                if (shares < 0.000001 && !showEmpty) {
+                    row.style.display = 'none';
+                } else {
+                    row.style.display = '';
+                }
+            });
+        }
+
+        // Aplicar filtro al cargar la página
+        window.addEventListener('load', function() {
+            filterEmptyTickers();
+        });
+
+        // Aplicar filtro cuando cambie el toggle
+        document.getElementById('showEmptyTickers').addEventListener('change', filterEmptyTickers);
     </script>
 
 </body>
