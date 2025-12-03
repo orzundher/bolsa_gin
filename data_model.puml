@@ -1,0 +1,79 @@
+@startuml data_model
+
+!define TABLE(name) class name << (T,#FFAAAA) >>
+!define PK(x) <u>x</u>
+!define FK(x) <i>x</i>
+
+hide methods
+hide stereotypes
+
+' Entities
+TABLE(Migration) {
+  PK(ID): uint
+  Name: string {unique}
+  AppliedAt: time.Time
+}
+
+TABLE(Ticker) {
+  PK(ID): uint
+  CreatedAt: time.Time
+  UpdatedAt: time.Time
+  DeletedAt: time.Time
+  --
+  Name: string {unique}
+  CurrentPrice: float64
+}
+
+TABLE(Investment) {
+  PK(ID): uint
+  CreatedAt: time.Time
+  UpdatedAt: time.Time
+  DeletedAt: time.Time
+  --
+  FK(TickerID): uint
+  PurchaseDate: time.Time
+  Shares: float64
+  PurchasePrice: float64
+  OperationCost: float64
+}
+
+TABLE(Sale) {
+  PK(ID): uint
+  CreatedAt: time.Time
+  UpdatedAt: time.Time
+  DeletedAt: time.Time
+  --
+  FK(TickerID): uint
+  SaleDate: time.Time
+  Shares: float64
+  SalePrice: float64
+  OperationCost: float64
+  WithheldTax: float64
+}
+
+' Relationships
+Ticker "1" -- "0..*" Investment : has
+Ticker "1" -- "0..*" Sale : has
+
+note right of Migration
+  Tracks applied database migrations
+end note
+
+note right of Ticker
+  Represents a stock ticker symbol
+  with its current price
+end note
+
+note right of Investment
+  Represents a stock purchase transaction
+  Uses gorm.Model (includes ID, CreatedAt,
+  UpdatedAt, DeletedAt)
+end note
+
+note right of Sale
+  Represents a stock sale transaction
+  Uses gorm.Model (includes ID, CreatedAt,
+  UpdatedAt, DeletedAt)
+end note
+
+@enduml
