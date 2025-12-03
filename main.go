@@ -83,13 +83,13 @@ type InvestmentView struct {
 
 // TickerSummaryView representa un resumen de las inversiones por ticker.
 type TickerSummaryView struct {
-	TickerID        uint
-	Ticker          string
-	TotalShares     float64
-	InvestedCapital float64
-	TotalCost       float64
-	CurrentValue    float64
-	ProfitLoss      float64
+	TickerID          uint
+	Ticker            string
+	TotalShares       float64
+	CurrentInvestment float64
+	TotalCost         float64
+	CurrentValue      float64
+	ProfitLoss        float64
 }
 
 // SaleView representa los datos de venta que se mostrarán en la página.
@@ -1497,7 +1497,7 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 		}
 
 		summary.TotalShares += view.Shares
-		summary.InvestedCapital += view.InvestedCapital
+		summary.CurrentInvestment += view.InvestedCapital
 		summary.TotalCost += view.OperationCost
 		summary.CurrentValue += view.CurrentValue
 		summary.ProfitLoss += view.ProfitLoss
@@ -1506,6 +1506,19 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 	// 5. Obtener todas las ventas de la BD con preload del ticker
 	var sales []Sale
 	db.Preload("Ticker").Order("sale_date desc").Find(&sales)
+
+	// Calcular el monto total de ventas por ticker
+	tickerSalesAmount := make(map[uint]float64)
+	for _, s := range sales {
+		tickerSalesAmount[s.TickerID] += s.Shares * s.SalePrice
+	}
+
+	// Restar el monto de ventas de CurrentInvestment
+	for tickerID, salesAmount := range tickerSalesAmount {
+		if summary, ok := summaries[tickerID]; ok {
+			summary.CurrentInvestment -= salesAmount
+		}
+	}
 
 	var summaryViews []TickerSummaryView
 	for _, summary := range summaries {
