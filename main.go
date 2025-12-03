@@ -55,6 +55,15 @@ type Sale struct {
 	WithheldTax   float64
 }
 
+// PriceHistory representa un snapshot histórico de precio de un ticker.
+type PriceHistory struct {
+	gorm.Model
+	SnapshotID string // UUID o timestamp para agrupar snapshots
+	TickerID   uint
+	Ticker     Ticker `gorm:"foreignKey:TickerID"`
+	Price      float64
+}
+
 // --- VISTAS ---
 
 // TickerView representa los datos de un ticker para mostrar en la UI.
@@ -335,6 +344,52 @@ func main() {
 		db.Delete(&Ticker{}, id)
 		log.Printf("Ticker %d eliminado", id)
 		c.Redirect(http.StatusFound, "/precios")
+	})
+
+	// Ruta para crear un snapshot de precios
+	router.POST("/create-snapshot", func(c *gin.Context) {
+		// Obtener todos los tickers
+		var tickers []Ticker
+		db.Find(&tickers)
+
+		if len(tickers) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"message": "No hay tickers para crear un snapshot",
+			})
+			return
+		}
+
+		// Generar un ID único para este snapshot usando timestamp
+		snapshotID := time.Now().Format("20060102-150405")
+
+		// Crear un registro de precio para cada ticker
+		var priceHistories []PriceHistory
+		for _, ticker := range tickers {
+			priceHistories = append(priceHistories, PriceHistory{
+				SnapshotID: snapshotID,
+				TickerID:   ticker.ID,
+				Price:      ticker.CurrentPrice,
+			})
+		}
+
+		// Guardar todos los registros en la base de datos
+		if err := db.Create(&priceHistories).Error; err != nil {
+			log.Printf("Error al crear snapshot: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"message": "Error al crear el snapshot",
+			})
+			return
+		}
+
+		log.Printf("Snapshot creado: %s con %d precios", snapshotID, len(priceHistories))
+		c.JSON(http.StatusOK, gin.H{
+			"success":    true,
+			"message":    fmt.Sprintf("Snapshot creado exitosamente con %d precios", len(priceHistories)),
+			"snapshotID": snapshotID,
+			"count":      len(priceHistories),
+		})
 	})
 
 	// Ruta para registrar una nueva compra
@@ -1241,6 +1296,7 @@ func runMigrations(database *gorm.DB) error {
 	migrations := map[string]func(*gorm.DB) error{
 		"001_create_initial_schema":       migration001CreateInitialSchema,
 		"002_migrate_to_ticker_id_schema": migration002MigrateToTickerIDSchema,
+		"003_create_price_history_table":  migration003CreatePriceHistoryTable,
 	}
 
 	// Obtener migraciones ya aplicadas
@@ -1430,6 +1486,27 @@ func migration002MigrateToTickerIDSchema(database *gorm.DB) error {
 	log.Println("  Tabla market_data eliminada")
 
 	log.Println("Migración de datos completada")
+	return nil
+}
+
+// migration003CreatePriceHistoryTable crea la tabla price_histories
+func migration003CreatePriceHistoryTable(database *gorm.DB) error {
+	log.Println("Creando tabla price_histories...")
+
+	if !database.Migrator().HasTable("price_histories") {
+		if err := database.AutoMigrate(&PriceHistory{}); err != nil {
+			return err
+		}
+		log.Println("  Tabla price_histories creada exitosamente")
+
+		// Crear índices para mejorar el rendimiento
+		database.Exec("CREATE INDEX idx_price_histories_snapshot_id ON price_histories(snapshot_id)")
+		database.Exec("CREATE INDEX idx_price_histories_ticker_id_created_at ON price_histories(ticker_id, created_at)")
+		log.Println("  Índices creados en price_histories")
+	} else {
+		log.Println("  Tabla price_histories ya existe")
+	}
+
 	return nil
 }
 

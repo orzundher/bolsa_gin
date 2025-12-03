@@ -38,8 +38,17 @@
             </div>
         </div>
 
-        <!-- Table -->
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Tickers Registrados</h2>
+        <!-- Table Header with Snapshot Button -->
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Tickers Registrados</h2>
+            <button onclick="createSnapshot()" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-blue-800">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Snapshot
+            </button>
+        </div>
         <div class="relative overflow-x-auto shadow-md sm:rounded-lg">
             <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400" id="tickersTable">
                 <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
@@ -156,6 +165,33 @@
                     input.select();
                 }
             }, 50);
+        }
+
+        // Función para crear un snapshot de precios
+        async function createSnapshot() {
+            if (!confirm('¿Crear un snapshot de todos los precios actuales?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/create-snapshot', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`✓ ${data.message}\nSnapshot ID: ${data.snapshotID}`);
+                } else {
+                    alert(`✗ Error: ${data.message}`);
+                }
+            } catch (error) {
+                console.error('Error al crear snapshot:', error);
+                alert('✗ Error al crear el snapshot. Por favor, intenta de nuevo.');
+            }
         }
     </script>
 
