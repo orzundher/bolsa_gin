@@ -1229,6 +1229,18 @@ func main() {
 		// Utilidad: diferencia entre valor actual y valor ponderado del portafolio
 		utilidad := (ticker.CurrentPrice * currentShares) - (portfolioWAC * currentShares)
 
+		// Obtener historial de precios del ticker
+		var priceHistories []PriceHistory
+		db.Where("ticker_id = ?", tickerID).Order("created_at asc").Find(&priceHistories)
+
+		// Preparar datos para el gráfico
+		var priceChartDates []string
+		var priceChartValues []float64
+		for _, ph := range priceHistories {
+			priceChartDates = append(priceChartDates, ph.CreatedAt.Format("02 Jan 2006 15:04"))
+			priceChartValues = append(priceChartValues, ph.Price)
+		}
+
 		c.HTML(http.StatusOK, "ticker_detail.html", gin.H{
 			"Ticker":            ticker,
 			"Investments":       investmentViews,
@@ -1243,6 +1255,8 @@ func main() {
 			"WACPerformance":    wacPerformance,
 			"Utilidad":          utilidad,
 			"TotalSaleUtility":  totalSaleUtility,
+			"PriceChartDates":   priceChartDates,
+			"PriceChartValues":  priceChartValues,
 			"ActivePage":        "resumen",
 		})
 	})

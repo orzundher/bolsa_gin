@@ -68,6 +68,14 @@
                 </div>
             </div>
 
+            {{if .PriceChartDates}}
+            <!-- Gráfico de Evolución de Precios -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Evolución del Precio</h2>
+                <div id="priceChart"></div>
+            </div>
+            {{end}}
+
             <!-- Tabla de Compras -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8">
                 <div class="p-4 border-b border-gray-200 dark:border-gray-700">
@@ -163,8 +171,79 @@
         </div>
     </div>
 
+    <!-- ApexCharts -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <!-- Flowbite JS -->
     <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+
+    {{if .PriceChartDates}}
+    <script>
+        // Datos del gráfico desde el backend
+        const chartDates = [{{range $index, $date := .PriceChartDates}}{{if $index}},{{end}}"{{$date}}"{{end}}];
+        const chartPrices = [{{range $index, $price := .PriceChartValues}}{{if $index}},{{end}}{{$price}}{{end}}];
+
+        // Configuración del gráfico
+        const options = {
+            series: [{
+                name: 'Precio',
+                data: chartPrices
+            }],
+            chart: {
+                type: 'line',
+                height: 350,
+                toolbar: {
+                    show: true
+                },
+                zoom: {
+                    enabled: true
+                }
+            },
+            dataLabels: {
+                enabled: false
+            },
+            stroke: {
+                curve: 'smooth',
+                width: 3
+            },
+            colors: ['#3B82F6'],
+            xaxis: {
+                categories: chartDates,
+                labels: {
+                    rotate: -45,
+                    rotateAlways: false,
+                    style: {
+                        colors: '#9CA3AF'
+                    }
+                }
+            },
+            yaxis: {
+                labels: {
+                    formatter: function(value) {
+                        return value.toFixed(4) + '€';
+                    },
+                    style: {
+                        colors: '#9CA3AF'
+                    }
+                }
+            },
+            tooltip: {
+                theme: 'dark',
+                y: {
+                    formatter: function(value) {
+                        return value.toFixed(4) + '€';
+                    }
+                }
+            },
+            grid: {
+                borderColor: '#374151'
+            }
+        };
+
+        // Renderizar el gráfico
+        const chart = new ApexCharts(document.querySelector("#priceChart"), options);
+        chart.render();
+    </script>
+    {{end}}
 
     <script>
         // Volver a resumen con la tecla ESC
