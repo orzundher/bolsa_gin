@@ -190,20 +190,51 @@
         const saleDates = [{{range $index, $date := .SaleChartDates}}{{if $index}},{{end}}"{{$date}}"{{end}}];
         const salePrices = [{{range $index, $price := .SaleChartPrices}}{{if $index}},{{end}}{{$price}}{{end}}];
 
+        // Debug: mostrar datos recibidos
+        console.log('Chart Dates:', chartDates);
+        console.log('Chart Prices:', chartPrices);
+        console.log('Purchase Dates:', purchaseDates);
+        console.log('Purchase Prices:', purchasePrices);
+        console.log('Sale Dates:', saleDates);
+        console.log('Sale Prices:', salePrices);
+
+        // Verificar que tenemos datos válidos antes de renderizar
+        if (chartDates.length === 0 || chartPrices.length === 0) {
+            console.warn('No hay datos de precios para mostrar en el gráfico');
+            document.querySelector("#priceChart").innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 py-8">No hay datos de snapshots disponibles</p>';
+        } else {
+
         // Función para convertir fecha "DD Mon YYYY HH:MM" a timestamp
         function parseDate(dateStr) {
-            const months = {
-                'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-                'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-            };
-            const parts = dateStr.split(' ');
-            const day = parseInt(parts[0]);
-            const month = months[parts[1]];
-            const year = parseInt(parts[2]);
-            const time = parts[3].split(':');
-            const hour = parseInt(time[0]);
-            const minute = parseInt(time[1]);
-            return new Date(year, month, day, hour, minute).getTime();
+            try {
+                const months = {
+                    'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+                    'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+                };
+                const parts = dateStr.split(' ');
+                if (parts.length < 4) {
+                    console.error('Invalid date format (too few parts):', dateStr, 'parts:', parts);
+                    return null;
+                }
+                const day = parseInt(parts[0]);
+                const month = months[parts[1]];
+                const year = parseInt(parts[2]);
+                const time = parts[3] ? parts[3].split(':') : ['0', '0'];
+                const hour = parseInt(time[0]);
+                const minute = parseInt(time[1]);
+                
+                if (isNaN(day) || month === undefined || isNaN(year) || isNaN(hour) || isNaN(minute)) {
+                    console.error('Invalid date components:', {dateStr, day, month, year, hour, minute});
+                    return null;
+                }
+                
+                const timestamp = new Date(year, month, day, hour, minute).getTime();
+                console.log('Parsed date:', dateStr, '→', timestamp, '→', new Date(timestamp));
+                return timestamp;
+            } catch (error) {
+                console.error('Error parsing date:', dateStr, error);
+                return null;
+            }
         }
 
         // Preparar series para el gráfico
@@ -213,31 +244,39 @@
             data: chartPrices.map((price, index) => ({
                 x: parseDate(chartDates[index]),
                 y: price
-            }))
+            })).filter(point => point.x !== null && !isNaN(point.y))
         }];
 
         // Agregar compras si existen
         if (purchaseDates.length > 0) {
-            series.push({
-                name: 'Compras',
-                type: 'scatter',
-                data: purchasePrices.map((price, index) => ({
-                    x: parseDate(purchaseDates[index]),
-                    y: price
-                }))
-            });
+            const purchaseData = purchasePrices.map((price, index) => ({
+                x: parseDate(purchaseDates[index]),
+                y: price
+            })).filter(point => point.x !== null && !isNaN(point.y));
+            
+            if (purchaseData.length > 0) {
+                series.push({
+                    name: 'Compras',
+                    type: 'scatter',
+                    data: purchaseData
+                });
+            }
         }
 
         // Agregar ventas si existen
         if (saleDates.length > 0) {
-            series.push({
-                name: 'Ventas',
-                type: 'scatter',
-                data: salePrices.map((price, index) => ({
-                    x: parseDate(saleDates[index]),
-                    y: price
-                }))
-            });
+            const saleData = salePrices.map((price, index) => ({
+                x: parseDate(saleDates[index]),
+                y: price
+            })).filter(point => point.x !== null && !isNaN(point.y));
+            
+            if (saleData.length > 0) {
+                series.push({
+                    name: 'Ventas',
+                    type: 'scatter',
+                    data: saleData
+                });
+            }
         }
 
         // Configuración del gráfico
@@ -258,14 +297,14 @@
             },
             stroke: {
                 curve: 'smooth',
-                width: [3, 0, 0] // Solo línea para precios, puntos para compras/ventas
+                width: 3
             },
             colors: ['#3B82F6', '#10B981', '#EF4444'], // Azul para precio, verde para compras, rojo para ventas
             markers: {
-                size: [4, 4, 4], // Tamaño uniforme para todos los puntos
+                size: 4, // Tamaño uniforme para todos los puntos
                 strokeWidth: 0, // Sin borde blanco
                 hover: {
-                    size: [6, 6, 6]
+                    size: 6
                 }
             },
             xaxis: {
@@ -321,6 +360,8 @@
         // Renderizar el gráfico
         const chart = new ApexCharts(document.querySelector("#priceChart"), options);
         chart.render();
+        console.log('Chart rendered successfully');
+        } // Cierre del else
     </script>
     {{end}}
 

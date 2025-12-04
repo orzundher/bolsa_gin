@@ -36,6 +36,7 @@
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Inversión Actual</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Costos Totales</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Valor Actual</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Rendimiento</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Posición</th>
                     </tr>
                 </thead>
@@ -46,6 +47,9 @@
                         <td class="px-6 py-4">{{printf "%.3f€" .CurrentInvestment}}</td>
                         <td class="px-6 py-4">{{printf "%.3f€" .TotalCost}}</td>
                         <td class="px-6 py-4">{{printf "%.3f€" .CurrentValue}}</td>
+                        <td class="px-6 py-4 font-bold {{if ge .Performance 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
+                            {{if ge .Performance 0.0}}+{{end}}{{printf "%.2f%%" .Performance}}
+                        </td>
                         <td class="px-6 py-4 font-bold {{if gt .ProfitLoss 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
                             {{printf "%.3f€" .ProfitLoss}}
                         </td>

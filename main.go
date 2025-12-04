@@ -99,6 +99,7 @@ type TickerSummaryView struct {
 	TotalCost         float64
 	CurrentValue      float64
 	ProfitLoss        float64
+	Performance       float64
 }
 
 // SaleView representa los datos de venta que se mostrarán en la página.
@@ -255,6 +256,28 @@ func main() {
 		})
 	})
 
+	// Ruta para mostrar la página de snapshots
+	router.GET("/snapshots", func(c *gin.Context) {
+		// Obtener todos los snapshots agrupados por SnapshotID
+		type SnapshotGroup struct {
+			SnapshotID string
+			CreatedAt  time.Time
+			Count      int64
+		}
+
+		var snapshots []SnapshotGroup
+		db.Model(&PriceHistory{}).
+			Select("snapshot_id, MIN(created_at) as created_at, COUNT(*) as count").
+			Group("snapshot_id").
+			Order("created_at DESC").
+			Scan(&snapshots)
+
+		c.HTML(http.StatusOK, "snapshots.html", gin.H{
+			"Snapshots":  snapshots,
+			"ActivePage": "snapshots",
+		})
+	})
+
 	// Ruta para agregar un nuevo ticker
 	router.POST("/add-ticker", func(c *gin.Context) {
 		name := strings.ToUpper(c.PostForm("name"))
@@ -390,6 +413,25 @@ func main() {
 			"snapshotID": snapshotID,
 			"count":      len(priceHistories),
 		})
+	})
+
+	// Ruta para eliminar un snapshot
+	router.POST("/delete-snapshot", func(c *gin.Context) {
+		snapshotID := c.PostForm("snapshot_id")
+
+		if snapshotID == "" {
+			c.Redirect(http.StatusFound, "/snapshots")
+			return
+		}
+
+		// Eliminar todos los registros con este snapshot_id
+		if err := db.Where("snapshot_id = ?", snapshotID).Delete(&PriceHistory{}).Error; err != nil {
+			log.Printf("Error al eliminar snapshot %s: %v", snapshotID, err)
+		} else {
+			log.Printf("Snapshot eliminado: %s", snapshotID)
+		}
+
+		c.Redirect(http.StatusFound, "/snapshots")
 	})
 
 	// Ruta para registrar una nueva compra
@@ -1744,11 +1786,16 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			summaryViews[i].TotalShares = state.Shares
 			summaryViews[i].CurrentValue = state.Shares * currentPrice
 			summaryViews[i].ProfitLoss = (currentPrice * state.Shares) - (wac * state.Shares)
+			// Rendimiento = ((Precio Actual - WAC) / WAC) * 100
+			if wac > 0 {
+				summaryViews[i].Performance = ((currentPrice - wac) / wac) * 100
+			}
 		} else {
 			// Si no hay acciones en cartera, poner todo en 0
 			summaryViews[i].TotalShares = 0
 			summaryViews[i].CurrentValue = 0
 			summaryViews[i].ProfitLoss = 0
+			summaryViews[i].Performance = 0
 		}
 	}
 
