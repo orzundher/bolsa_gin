@@ -1241,23 +1241,43 @@ func main() {
 			priceChartValues = append(priceChartValues, ph.Price)
 		}
 
+		// Preparar datos de compras para el gráfico
+		var purchaseChartDates []string
+		var purchaseChartPrices []float64
+		for _, inv := range investmentViews {
+			purchaseChartDates = append(purchaseChartDates, inv.PurchaseDate)
+			purchaseChartPrices = append(purchaseChartPrices, inv.PurchasePrice)
+		}
+
+		// Preparar datos de ventas para el gráfico
+		var saleChartDates []string
+		var saleChartPrices []float64
+		for _, s := range saleViews {
+			saleChartDates = append(saleChartDates, s.SaleDate)
+			saleChartPrices = append(saleChartPrices, s.SalePrice)
+		}
+
 		c.HTML(http.StatusOK, "ticker_detail.html", gin.H{
-			"Ticker":            ticker,
-			"Investments":       investmentViews,
-			"Sales":             saleViews,
-			"TotalInvested":     totalInvested,
-			"TotalCostBuy":      totalCostBuy,
-			"TotalSold":         totalSold,
-			"TotalCostSell":     totalCostSell,
-			"TotalCosts":        totalCostBuy + totalCostSell,
-			"SharesInPortfolio": currentShares,
-			"PortfolioWAC":      portfolioWAC,
-			"WACPerformance":    wacPerformance,
-			"Utilidad":          utilidad,
-			"TotalSaleUtility":  totalSaleUtility,
-			"PriceChartDates":   priceChartDates,
-			"PriceChartValues":  priceChartValues,
-			"ActivePage":        "resumen",
+			"Ticker":              ticker,
+			"Investments":         investmentViews,
+			"Sales":               saleViews,
+			"TotalInvested":       totalInvested,
+			"TotalCostBuy":        totalCostBuy,
+			"TotalSold":           totalSold,
+			"TotalCostSell":       totalCostSell,
+			"TotalCosts":          totalCostBuy + totalCostSell,
+			"SharesInPortfolio":   currentShares,
+			"PortfolioWAC":        portfolioWAC,
+			"WACPerformance":      wacPerformance,
+			"Utilidad":            utilidad,
+			"TotalSaleUtility":    totalSaleUtility,
+			"PriceChartDates":     priceChartDates,
+			"PriceChartValues":    priceChartValues,
+			"PurchaseChartDates":  purchaseChartDates,
+			"PurchaseChartPrices": purchaseChartPrices,
+			"SaleChartDates":      saleChartDates,
+			"SaleChartPrices":     saleChartPrices,
+			"ActivePage":          "resumen",
 		})
 	})
 

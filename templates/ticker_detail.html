@@ -181,16 +181,71 @@
         // Datos del gráfico desde el backend
         const chartDates = [{{range $index, $date := .PriceChartDates}}{{if $index}},{{end}}"{{$date}}"{{end}}];
         const chartPrices = [{{range $index, $price := .PriceChartValues}}{{if $index}},{{end}}{{$price}}{{end}}];
+        
+        // Datos de compras
+        const purchaseDates = [{{range $index, $date := .PurchaseChartDates}}{{if $index}},{{end}}"{{$date}}"{{end}}];
+        const purchasePrices = [{{range $index, $price := .PurchaseChartPrices}}{{if $index}},{{end}}{{$price}}{{end}}];
+        
+        // Datos de ventas
+        const saleDates = [{{range $index, $date := .SaleChartDates}}{{if $index}},{{end}}"{{$date}}"{{end}}];
+        const salePrices = [{{range $index, $price := .SaleChartPrices}}{{if $index}},{{end}}{{$price}}{{end}}];
+
+        // Función para convertir fecha "DD Mon YYYY HH:MM" a timestamp
+        function parseDate(dateStr) {
+            const months = {
+                'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+                'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+            };
+            const parts = dateStr.split(' ');
+            const day = parseInt(parts[0]);
+            const month = months[parts[1]];
+            const year = parseInt(parts[2]);
+            const time = parts[3].split(':');
+            const hour = parseInt(time[0]);
+            const minute = parseInt(time[1]);
+            return new Date(year, month, day, hour, minute).getTime();
+        }
+
+        // Preparar series para el gráfico
+        const series = [{
+            name: 'Precio',
+            type: 'line',
+            data: chartPrices.map((price, index) => ({
+                x: parseDate(chartDates[index]),
+                y: price
+            }))
+        }];
+
+        // Agregar compras si existen
+        if (purchaseDates.length > 0) {
+            series.push({
+                name: 'Compras',
+                type: 'scatter',
+                data: purchasePrices.map((price, index) => ({
+                    x: parseDate(purchaseDates[index]),
+                    y: price
+                }))
+            });
+        }
+
+        // Agregar ventas si existen
+        if (saleDates.length > 0) {
+            series.push({
+                name: 'Ventas',
+                type: 'scatter',
+                data: salePrices.map((price, index) => ({
+                    x: parseDate(saleDates[index]),
+                    y: price
+                }))
+            });
+        }
 
         // Configuración del gráfico
         const options = {
-            series: [{
-                name: 'Precio',
-                data: chartPrices
-            }],
+            series: series,
             chart: {
                 type: 'line',
-                height: 350,
+                height: 400,
                 toolbar: {
                     show: true
                 },
@@ -203,14 +258,21 @@
             },
             stroke: {
                 curve: 'smooth',
-                width: 3
+                width: [3, 0, 0] // Solo línea para precios, puntos para compras/ventas
             },
-            colors: ['#3B82F6'],
+            colors: ['#3B82F6', '#10B981', '#EF4444'], // Azul para precio, verde para compras, rojo para ventas
+            markers: {
+                size: [4, 4, 4], // Tamaño uniforme para todos los puntos
+                strokeWidth: 0, // Sin borde blanco
+                hover: {
+                    size: [6, 6, 6]
+                }
+            },
             xaxis: {
-                categories: chartDates,
+                type: 'datetime',
                 labels: {
-                    rotate: -45,
-                    rotateAlways: false,
+                    datetimeUTC: false,
+                    format: 'dd MMM yyyy',
                     style: {
                         colors: '#9CA3AF'
                     }
@@ -228,10 +290,27 @@
             },
             tooltip: {
                 theme: 'dark',
+                x: {
+                    format: 'dd MMM yyyy HH:mm'
+                },
                 y: {
                     formatter: function(value) {
                         return value.toFixed(4) + '€';
                     }
+                }
+            },
+            legend: {
+                show: true,
+                position: 'top',
+                horizontalAlign: 'center',
+                labels: {
+                    colors: '#9CA3AF'
+                },
+                markers: {
+                    width: 8,
+                    height: 8,
+                    strokeWidth: 0,
+                    radius: 4
                 }
             },
             grid: {
