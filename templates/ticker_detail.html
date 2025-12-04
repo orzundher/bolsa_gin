@@ -43,7 +43,7 @@
                     <h3 class="text-xl font-bold text-gray-900 dark:text-white">{{printf "%.3f€" .TotalSold}}</h3>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Costos Totales</h4>
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Comisiones Totales</h4>
                     <h3 class="text-xl font-bold text-red-600 dark:text-red-400">{{printf "%.3f€" .TotalCosts}}</h3>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
@@ -51,7 +51,7 @@
                     <h3 class="text-xl font-bold text-blue-600 dark:text-blue-400">{{printf "%.6f" .SharesInPortfolio}}</h3>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Precio Ponderado</h4>
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Costo Ponderado</h4>
                     <h3 class="text-xl font-bold text-purple-600 dark:text-purple-400">{{printf "%.4f€" .PortfolioWAC}}</h3>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
@@ -279,6 +279,42 @@
             }
         }
 
+        // Agregar línea horizontal del WAC (Precio de Compra Ponderado)
+        const wacValue = {{.PortfolioWAC}};
+        if (wacValue > 0) {
+            // Encontrar la fecha mínima y máxima de todas las series
+            let allDates = [];
+            
+            // Agregar fechas de snapshots
+            chartDates.forEach(date => allDates.push(parseDate(date)));
+            
+            // Agregar fechas de compras
+            purchaseDates.forEach(date => allDates.push(parseDate(date)));
+            
+            // Agregar fechas de ventas
+            saleDates.forEach(date => allDates.push(parseDate(date)));
+            
+            // Filtrar nulls y encontrar min/max
+            allDates = allDates.filter(d => d !== null);
+            
+            if (allDates.length > 0) {
+                const minDate = Math.min(...allDates);
+                const maxDate = Math.max(...allDates);
+                
+                // Crear puntos para la línea horizontal del WAC
+                const wacData = [
+                    { x: minDate, y: wacValue },
+                    { x: maxDate, y: wacValue }
+                ];
+                
+                series.push({
+                    name: 'Ponderado',
+                    type: 'line',
+                    data: wacData
+                });
+            }
+        }
+
         // Configuración del gráfico
         const options = {
             series: series,
@@ -299,7 +335,7 @@
                 curve: 'smooth',
                 width: 3
             },
-            colors: ['#3B82F6', '#10B981', '#EF4444'], // Azul para precio, verde para compras, rojo para ventas
+            colors: ['#3B82F6', '#10B981', '#EF4444', '#9333EA'], // Azul: precio, Verde: compras, Rojo: ventas, Morado: Ponderado
             markers: {
                 size: 4, // Tamaño uniforme para todos los puntos
                 strokeWidth: 0, // Sin borde blanco
