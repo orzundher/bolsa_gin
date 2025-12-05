@@ -68,10 +68,12 @@ type PriceHistory struct {
 
 // TickerView representa los datos de un ticker para mostrar en la UI.
 type TickerView struct {
-	ID           uint
-	Name         string
-	CurrentPrice float64
-	UpdatedAt    string
+	ID                uint
+	Name              string
+	CurrentPrice      float64
+	UpdatedAt         string
+	SnapshotChange    float64 // Cambio porcentual entre los últimos 2 snapshots
+	HasSnapshotChange bool    // Indica si hay datos suficientes para mostrar el cambio
 }
 
 // InvestmentView representa los datos de inversión que se mostrarán en la página.
@@ -240,13 +242,68 @@ func main() {
 		var tickers []Ticker
 		db.Order("name").Find(&tickers)
 
+		// Obtener los dos últimos snapshots
+		type SnapshotInfo struct {
+			SnapshotID string
+			CreatedAt  time.Time
+		}
+		var snapshots []SnapshotInfo
+		db.Model(&PriceHistory{}).
+			Select("DISTINCT snapshot_id, MIN(created_at) as created_at").
+			Group("snapshot_id").
+			Order("created_at DESC").
+			Limit(2).
+			Scan(&snapshots)
+
+		// Crear un mapa para almacenar los cambios porcentuales por ticker
+		snapshotChanges := make(map[uint]*float64)
+
+		// Si hay al menos 2 snapshots, calcular los cambios
+		if len(snapshots) >= 2 {
+			lastSnapshotID := snapshots[0].SnapshotID
+			prevSnapshotID := snapshots[1].SnapshotID
+
+			// Obtener precios del último snapshot
+			var lastPrices []PriceHistory
+			db.Where("snapshot_id = ?", lastSnapshotID).Find(&lastPrices)
+			lastPriceMap := make(map[uint]float64)
+			for _, p := range lastPrices {
+				lastPriceMap[p.TickerID] = p.Price
+			}
+
+			// Obtener precios del snapshot anterior
+			var prevPrices []PriceHistory
+			db.Where("snapshot_id = ?", prevSnapshotID).Find(&prevPrices)
+			prevPriceMap := make(map[uint]float64)
+			for _, p := range prevPrices {
+				prevPriceMap[p.TickerID] = p.Price
+			}
+
+			// Calcular cambios porcentuales
+			for tickerID, lastPrice := range lastPriceMap {
+				if prevPrice, exists := prevPriceMap[tickerID]; exists && prevPrice > 0 {
+					change := ((lastPrice - prevPrice) / prevPrice) * 100
+					snapshotChanges[tickerID] = &change
+				}
+			}
+		}
+
 		var tickerViews []TickerView
 		for _, t := range tickers {
+			changePtr := snapshotChanges[t.ID]
+			hasChange := changePtr != nil
+			changeVal := 0.0
+			if hasChange {
+				changeVal = *changePtr
+			}
+
 			tickerViews = append(tickerViews, TickerView{
-				ID:           t.ID,
-				Name:         t.Name,
-				CurrentPrice: t.CurrentPrice,
-				UpdatedAt:    t.UpdatedAt.Format("02 Jan 2006 15:04"),
+				ID:                t.ID,
+				Name:              t.Name,
+				CurrentPrice:      t.CurrentPrice,
+				UpdatedAt:         t.UpdatedAt.Format("02 Jan 2006 15:04"),
+				SnapshotChange:    changeVal,
+				HasSnapshotChange: hasChange,
 			})
 		}
 
