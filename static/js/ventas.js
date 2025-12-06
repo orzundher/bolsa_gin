@@ -21,13 +21,13 @@ document.addEventListener('DOMContentLoaded', function () {
  */
 function submitEditForm() {
     const form = document.getElementById('editSaleForm');
-    
+
     // Validate form
     if (!form.checkValidity()) {
         form.reportValidity();
         return;
     }
-    
+
     const saleId = document.getElementById('edit_sale_id').value;
 
     // Get form values
@@ -171,13 +171,13 @@ function openEditModal(id, ticker, tickerId, saleDate, shares, salePrice, operat
             const year = dateMatch[3];
             const hour = dateMatch[4] || '00';
             const minute = dateMatch[5] || '00';
-            
-            const monthMap = { 
-                'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06', 
-                'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12' 
+
+            const monthMap = {
+                'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
+                'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
             };
             const month = monthMap[monthStr] || '01';
-            
+
             dateInput.value = `${year}-${month}-${day}T${hour}:${minute}`;
         }
     }
@@ -210,3 +210,44 @@ document.addEventListener('click', function (event) {
     }
 });
 
+/**
+ * Opens the add sale modal
+ */
+function openAddSaleModal() {
+    const modal = document.getElementById('addSaleModal');
+
+    // Reset form
+    const form = document.getElementById('addSaleForm');
+    form.reset();
+
+    // Set current date and time as default
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+
+    document.getElementById('add_sale_date').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+    // Show modal
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+/**
+ * Closes the add sale modal
+ */
+function closeAddSaleModal() {
+    const modal = document.getElementById('addSaleModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+// Close add modal when clicking outside of it
+document.addEventListener('click', function (event) {
+    const addModal = document.getElementById('addSaleModal');
+    if (addModal && event.target === addModal) {
+        closeAddSaleModal();
+    }
+});

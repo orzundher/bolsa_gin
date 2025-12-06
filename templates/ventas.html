@@ -17,60 +17,14 @@
     <div class="p-4 sm:ml-64">
         <div class="p-4 mt-14">
 
-        <!-- Form Card -->
+        <!-- Botón para abrir modal de nueva venta -->
         <div class="mb-8">
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-                <h5 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Registrar Nueva Venta</h5>
-                <form action="/add-sale" method="post">
-                    <input type="hidden" name="redirect_to" value="/ventas">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <!-- Ticker -->
-                        <div>
-                            <label for="sale_ticker_id" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Ticker</label>
-                            <select name="ticker_id" id="sale_ticker_id" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" required>
-                                <option value="">Seleccionar Ticker</option>
-                                {{range .Tickers}}
-                                <option value="{{.ID}}">{{.Name}}</option>
-                                {{end}}
-                            </select>
-                        </div>
-                        
-                        <!-- Fecha Venta -->
-                        <div>
-                            <label for="sale_date" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Fecha y Hora</label>
-                            <input type="datetime-local" name="sale_date" id="sale_date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" required>
-                        </div>
-                        
-                        <!-- Acciones -->
-                        <div>
-                            <label for="sale_shares" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Acciones</label>
-                            <input type="number" step="any" name="shares" id="sale_shares" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" required>
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <!-- Precio Venta -->
-                        <div>
-                            <label for="sale_price" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Precio Venta</label>
-                            <input type="number" step="any" name="sale_price" id="sale_price" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" required>
-                        </div>
-                        
-                        <!-- Costo Operación -->
-                        <div>
-                            <label for="sale_operation_cost" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Costo Operación</label>
-                            <input type="number" step="any" name="operation_cost" id="sale_operation_cost" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                        </div>
-                        
-                        <!-- Impuesto Retenido -->
-                        <div>
-                            <label for="sale_withheld_tax" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Impuesto Retenido</label>
-                            <input type="number" step="any" name="withheld_tax" id="sale_withheld_tax" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                        </div>
-                    </div>
-                    
-                    <button type="submit" class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">Registrar Venta</button>
-                </form>
-            </div>
+            <button type="button" onclick="openAddSaleModal()" class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">
+                <svg class="w-5 h-5 me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Registrar Nueva Venta
+            </button>
         </div>
 
         <!-- Table -->
@@ -231,12 +185,91 @@
         </div>
     </div>
 
+    <!-- Add Sale Modal -->
+    <div id="addSaleModal" tabindex="-1" aria-hidden="true" class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full">
+        <div class="relative p-4 w-full max-w-2xl max-h-full">
+            <!-- Modal content -->
+            <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
+                <!-- Modal header -->
+                <div class="flex items-center justify-between p-4 md:p-5 border-b rounded-t dark:border-gray-600">
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
+                        Registrar Nueva Venta
+                    </h3>
+                    <button type="button" onclick="closeAddSaleModal()" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white">
+                        <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                        </svg>
+                        <span class="sr-only">Cerrar modal</span>
+                    </button>
+                </div>
+                <!-- Modal body -->
+                <form id="addSaleForm" action="/add-sale" method="post">
+                    <div class="p-4 md:p-5 space-y-4">
+                        <input type="hidden" name="redirect_to" value="/ventas">
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Ticker -->
+                            <div>
+                                <label for="add_ticker_id" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Ticker</label>
+                                <select name="ticker_id" id="add_ticker_id" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                                    <option value="">Seleccionar Ticker</option>
+                                    {{range .Tickers}}
+                                    <option value="{{.ID}}">{{.Name}}</option>
+                                    {{end}}
+                                </select>
+                            </div>
+                            
+                            <!-- Fecha Venta -->
+                            <div>
+                                <label for="add_sale_date" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Fecha y Hora</label>
+                                <input type="datetime-local" name="sale_date" id="add_sale_date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Acciones -->
+                            <div>
+                                <label for="add_shares" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Acciones</label>
+                                <input type="number" step="any" name="shares" id="add_shares" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                            </div>
+                            
+                            <!-- Precio Venta -->
+                            <div>
+                                <label for="add_sale_price" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Precio Venta</label>
+                                <input type="number" step="any" name="sale_price" id="add_sale_price" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Costo Operación -->
+                            <div>
+                                <label for="add_operation_cost" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Costo Operación</label>
+                                <input type="number" step="any" name="operation_cost" id="add_operation_cost" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                            </div>
+                            
+                            <!-- Impuesto Retenido -->
+                            <div>
+                                <label for="add_withheld_tax" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Impuesto Retenido</label>
+                                <input type="number" step="any" name="withheld_tax" id="add_withheld_tax" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Modal footer -->
+                    <div class="flex items-center p-4 md:p-5 border-t border-gray-200 rounded-b dark:border-gray-600">
+                        <button type="submit" class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">Registrar Venta</button>
+                        <button type="button" onclick="closeAddSaleModal()" class="py-2.5 px-5 ms-3 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
 
 
     <!-- Flowbite JS -->
     <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
     <script src="/static/js/table-sort.js"></script>
-    <script src="/static/js/ventas.js?v=2"></script>
+    <script src="/static/js/ventas.js?v=3"></script>
 
 </body>
 

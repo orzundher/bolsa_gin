@@ -1380,6 +1380,137 @@ func main() {
 		})
 	})
 
+	// API: Obtener historial de utilidad de la cartera por snapshot
+	router.GET("/api/portfolio-utility-history", func(c *gin.Context) {
+		// Obtener todos los snapshots ordenados por fecha
+		type SnapshotInfo struct {
+			SnapshotID string
+			CreatedAt  time.Time
+		}
+		var snapshots []SnapshotInfo
+		db.Model(&PriceHistory{}).
+			Select("DISTINCT snapshot_id, MIN(created_at) as created_at").
+			Group("snapshot_id").
+			Order("created_at ASC").
+			Scan(&snapshots)
+
+		if len(snapshots) == 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"dates":     []string{},
+				"utilities": []float64{},
+			})
+			return
+		}
+
+		// Obtener todas las inversiones y ventas
+		var allInvestments []Investment
+		db.Preload("Ticker").Order("purchase_date asc").Find(&allInvestments)
+
+		var allSales []Sale
+		db.Preload("Ticker").Order("sale_date asc").Find(&allSales)
+
+		// Para cada snapshot, calcular la utilidad de la cartera en ese momento
+		var dates []string
+		var utilities []float64
+
+		for _, snapshot := range snapshots {
+			// Obtener los precios de este snapshot
+			var priceHistories []PriceHistory
+			db.Where("snapshot_id = ?", snapshot.SnapshotID).Find(&priceHistories)
+
+			// Crear mapa de precios del snapshot
+			snapshotPrices := make(map[uint]float64)
+			for _, ph := range priceHistories {
+				snapshotPrices[ph.TickerID] = ph.Price
+			}
+
+			// Filtrar inversiones y ventas hasta la fecha del snapshot
+			type Event struct {
+				Date   time.Time
+				Type   string
+				Shares float64
+				Price  float64
+			}
+
+			tickerEvents := make(map[uint][]Event)
+
+			// Agregar compras hasta la fecha del snapshot
+			for _, inv := range allInvestments {
+				if inv.PurchaseDate.Before(snapshot.CreatedAt) || inv.PurchaseDate.Equal(snapshot.CreatedAt) {
+					tickerEvents[inv.TickerID] = append(tickerEvents[inv.TickerID], Event{
+						Date:   inv.PurchaseDate,
+						Type:   "buy",
+						Shares: inv.Shares,
+						Price:  inv.PurchasePrice,
+					})
+				}
+			}
+
+			// Agregar ventas hasta la fecha del snapshot
+			for _, sale := range allSales {
+				if sale.SaleDate.Before(snapshot.CreatedAt) || sale.SaleDate.Equal(snapshot.CreatedAt) {
+					tickerEvents[sale.TickerID] = append(tickerEvents[sale.TickerID], Event{
+						Date:   sale.SaleDate,
+						Type:   "sell",
+						Shares: sale.Shares,
+						Price:  sale.SalePrice,
+					})
+				}
+			}
+
+			// Calcular el estado de la cartera en este snapshot
+			totalUtility := 0.0
+
+			for tickerID, events := range tickerEvents {
+				// Ordenar eventos por fecha
+				sort.Slice(events, func(i, j int) bool {
+					if events[i].Date.Equal(events[j].Date) {
+						return events[i].Type == "buy"
+					}
+					return events[i].Date.Before(events[j].Date)
+				})
+
+				currentShares := 0.0
+				currentCapital := 0.0
+
+				for _, e := range events {
+					if e.Type == "buy" {
+						currentShares += e.Shares
+						currentCapital += e.Shares * e.Price
+					} else if e.Type == "sell" {
+						wac := 0.0
+						if currentShares > 0 {
+							wac = currentCapital / currentShares
+						}
+						currentCapital -= e.Shares * wac
+						currentShares -= e.Shares
+					}
+				}
+
+				// Calcular utilidad para este ticker
+				if currentShares > 0 {
+					snapshotPrice, exists := snapshotPrices[tickerID]
+					if exists {
+						wac := 0.0
+						if currentShares > 0 {
+							wac = currentCapital / currentShares
+						}
+						utility := (snapshotPrice - wac) * currentShares
+						totalUtility += utility
+					}
+				}
+			}
+
+			dates = append(dates, snapshot.CreatedAt.Format("02 Jan 2006 15:04"))
+			utilities = append(utilities, totalUtility)
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"dates":     dates,
+			"utilities": utilities,
+		})
+	})
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8081"
