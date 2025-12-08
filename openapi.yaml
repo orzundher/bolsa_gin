@@ -1,0 +1,1008 @@
+openapi: 3.0.3
+info:
+  title: Bolsa GIN API
+  description: |
+    API para gestión de inversiones en bolsa. Permite administrar tickers, compras, ventas, 
+    snapshots de precios y obtener análisis de rendimiento de la cartera.
+  version: 1.0.0
+  contact:
+    name: Bolsa GIN Support
+servers:
+  - url: http://localhost:8081
+    description: Servidor de desarrollo local
+
+tags:
+  - name: Tickers
+    description: Gestión de símbolos bursátiles
+  - name: Inversiones
+    description: Gestión de compras de acciones
+  - name: Ventas
+    description: Gestión de ventas de acciones
+  - name: Snapshots
+    description: Gestión de snapshots históricos de precios
+  - name: Análisis
+    description: Endpoints de análisis y cálculos
+  - name: Vistas
+    description: Endpoints que devuelven vistas HTML
+
+paths:
+  # ==================== VISTAS HTML ====================
+  /:
+    get:
+      tags:
+        - Vistas
+      summary: Página principal
+      description: Muestra el resumen general de la cartera con inversiones, ventas y métricas
+      responses:
+        '200':
+          description: Página HTML con el dashboard principal
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /resumen:
+    get:
+      tags:
+        - Vistas
+      summary: Página de resumen
+      description: Muestra el resumen agrupado por ticker
+      responses:
+        '200':
+          description: Página HTML con resumen por ticker
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /compras:
+    get:
+      tags:
+        - Vistas
+      summary: Página de compras
+      description: Muestra el historial de compras y formulario para registrar nuevas
+      responses:
+        '200':
+          description: Página HTML con historial de compras
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /ventas:
+    get:
+      tags:
+        - Vistas
+      summary: Página de ventas
+      description: Muestra el historial de ventas y formulario para registrar nuevas
+      responses:
+        '200':
+          description: Página HTML con historial de ventas
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /precios:
+    get:
+      tags:
+        - Vistas
+      summary: Página de precios
+      description: Muestra todos los tickers registrados con sus precios actuales y cambios
+      responses:
+        '200':
+          description: Página HTML con lista de tickers
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /snapshots:
+    get:
+      tags:
+        - Vistas
+      summary: Página de snapshots
+      description: Muestra todos los snapshots de precios históricos
+      responses:
+        '200':
+          description: Página HTML con lista de snapshots
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /ticker/{id}:
+    get:
+      tags:
+        - Vistas
+      summary: Detalle de ticker
+      description: Muestra información detallada de un ticker específico con gráficos
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID del ticker
+      responses:
+        '200':
+          description: Página HTML con detalle del ticker
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: ID inválido
+        '404':
+          description: Ticker no encontrado
+
+  /edit/{id}:
+    get:
+      tags:
+        - Vistas
+      summary: Formulario de edición de compra
+      description: Muestra el formulario para editar una compra existente
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la compra
+      responses:
+        '200':
+          description: Página HTML con formulario de edición
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: ID inválido
+        '404':
+          description: Registro no encontrado
+
+  # ==================== TICKERS ====================
+  /add-ticker:
+    post:
+      tags:
+        - Tickers
+      summary: Agregar nuevo ticker
+      description: Crea un nuevo símbolo bursátil en el sistema
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Nombre del ticker (se convierte a mayúsculas)
+                  example: AAPL
+                current_price:
+                  type: number
+                  format: float
+                  description: Precio actual del ticker
+                  example: 150.50
+      responses:
+        '302':
+          description: Redirección a /precios
+        '400':
+          description: Error de validación (nombre vacío o ticker ya existe)
+
+  /update-ticker/{id}:
+    post:
+      tags:
+        - Tickers
+      summary: Actualizar ticker
+      description: Actualiza el nombre y/o precio de un ticker existente
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID del ticker
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Nuevo nombre del ticker
+                  example: AAPL
+                current_price:
+                  type: number
+                  format: float
+                  description: Nuevo precio del ticker
+                  example: 155.75
+      responses:
+        '302':
+          description: Redirección a /precios
+        '400':
+          description: Error de validación
+        '404':
+          description: Ticker no encontrado
+
+  /delete-ticker:
+    post:
+      tags:
+        - Tickers
+      summary: Eliminar ticker
+      description: Elimina un ticker si no tiene inversiones o ventas asociadas
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: integer
+                  description: ID del ticker a eliminar
+                  example: 1
+      responses:
+        '302':
+          description: Redirección a /precios
+        '400':
+          description: Error de validación o ticker tiene registros asociados
+
+  # ==================== SNAPSHOTS ====================
+  /create-snapshot:
+    post:
+      tags:
+        - Snapshots
+      summary: Crear snapshot de precios
+      description: Crea un snapshot con los precios actuales de todos los tickers
+      responses:
+        '200':
+          description: Snapshot creado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Snapshot creado exitosamente con 5 precios"
+                  snapshotID:
+                    type: string
+                    example: "20231207-154530"
+                  count:
+                    type: integer
+                    example: 5
+        '400':
+          description: No hay tickers para crear snapshot
+        '500':
+          description: Error al crear el snapshot
+
+  /delete-snapshot:
+    post:
+      tags:
+        - Snapshots
+      summary: Eliminar snapshot
+      description: Elimina todos los registros de un snapshot específico
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - snapshot_id
+              properties:
+                snapshot_id:
+                  type: string
+                  description: ID del snapshot a eliminar
+                  example: "20231207-154530"
+      responses:
+        '302':
+          description: Redirección a /snapshots
+
+  # ==================== INVERSIONES (COMPRAS) ====================
+  /add-investment:
+    post:
+      tags:
+        - Inversiones
+      summary: Registrar nueva compra
+      description: Registra una nueva compra de acciones
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - ticker_id
+                - purchase_date
+                - shares
+                - purchase_price
+              properties:
+                ticker_id:
+                  type: integer
+                  description: ID del ticker
+                  example: 1
+                purchase_date:
+                  type: string
+                  format: date-time
+                  description: Fecha y hora de la compra (formato ISO 8601 o YYYY-MM-DD)
+                  example: "2023-12-07T10:30"
+                shares:
+                  type: number
+                  format: float
+                  description: Cantidad de acciones compradas
+                  example: 10.5
+                purchase_price:
+                  type: number
+                  format: float
+                  description: Precio de compra por acción
+                  example: 150.50
+                operation_cost:
+                  type: number
+                  format: float
+                  description: Costo de operación (comisiones, etc.)
+                  example: 5.0
+                redirect_to:
+                  type: string
+                  description: URL a la que redirigir después de crear
+                  example: "/compras"
+      responses:
+        '302':
+          description: Redirección a la página especificada
+        '400':
+          description: Error de validación
+
+  /update/{id}:
+    post:
+      tags:
+        - Inversiones
+      summary: Actualizar compra
+      description: Actualiza los datos de una compra existente
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la compra
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                ticker_id:
+                  type: integer
+                purchase_date:
+                  type: string
+                  format: date-time
+                shares:
+                  type: number
+                  format: float
+                purchase_price:
+                  type: number
+                  format: float
+                operation_cost:
+                  type: number
+                  format: float
+      responses:
+        '302':
+          description: Redirección a /compras
+        '400':
+          description: ID inválido
+        '404':
+          description: Registro no encontrado
+
+  /delete-investment:
+    post:
+      tags:
+        - Inversiones
+      summary: Eliminar compra
+      description: Marca una compra como eliminada (soft delete)
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: integer
+                  description: ID de la compra a eliminar
+                  example: 1
+                redirect_to:
+                  type: string
+                  description: URL a la que redirigir
+                  example: "/compras"
+      responses:
+        '302':
+          description: Redirección a la página especificada
+        '400':
+          description: ID inválido
+
+  # ==================== VENTAS ====================
+  /add-sale:
+    post:
+      tags:
+        - Ventas
+      summary: Registrar nueva venta
+      description: Registra una nueva venta de acciones
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - ticker_id
+                - sale_date
+                - shares
+                - sale_price
+              properties:
+                ticker_id:
+                  type: integer
+                  description: ID del ticker
+                  example: 1
+                sale_date:
+                  type: string
+                  format: date-time
+                  description: Fecha y hora de la venta
+                  example: "2023-12-07T15:30"
+                shares:
+                  type: number
+                  format: float
+                  description: Cantidad de acciones vendidas
+                  example: 5.0
+                sale_price:
+                  type: number
+                  format: float
+                  description: Precio de venta por acción
+                  example: 160.00
+                operation_cost:
+                  type: number
+                  format: float
+                  description: Costo de operación
+                  example: 3.0
+                withheld_tax:
+                  type: number
+                  format: float
+                  description: Impuesto retenido
+                  example: 10.0
+                redirect_to:
+                  type: string
+                  description: URL a la que redirigir
+                  example: "/ventas"
+      responses:
+        '302':
+          description: Redirección a la página especificada
+        '400':
+          description: Error de validación
+
+  /update-sale/{id}:
+    post:
+      tags:
+        - Ventas
+      summary: Actualizar venta
+      description: Actualiza los datos de una venta existente
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la venta
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                ticker_id:
+                  type: integer
+                sale_date:
+                  type: string
+                  format: date-time
+                shares:
+                  type: number
+                  format: float
+                sale_price:
+                  type: number
+                  format: float
+                operation_cost:
+                  type: number
+                  format: float
+                withheld_tax:
+                  type: number
+                  format: float
+                redirect_to:
+                  type: string
+      responses:
+        '302':
+          description: Redirección a la página especificada
+        '400':
+          description: ID inválido
+        '404':
+          description: Venta no encontrada
+
+  /delete-sale:
+    post:
+      tags:
+        - Ventas
+      summary: Eliminar venta
+      description: Marca una venta como eliminada (soft delete)
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: integer
+                  description: ID de la venta a eliminar
+                  example: 1
+                redirect_to:
+                  type: string
+                  description: URL a la que redirigir
+                  example: "/ventas"
+      responses:
+        '302':
+          description: Redirección a la página especificada
+        '400':
+          description: ID inválido
+
+  # ==================== API JSON ====================
+  /api/investment/{id}:
+    get:
+      tags:
+        - Inversiones
+      summary: Obtener datos de una compra
+      description: Devuelve los datos de una compra específica en formato JSON
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la compra
+      responses:
+        '200':
+          description: Datos de la compra
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvestmentResponse'
+        '400':
+          description: ID inválido
+        '404':
+          description: Registro no encontrado
+
+    put:
+      tags:
+        - Inversiones
+      summary: Actualizar compra (API JSON)
+      description: Actualiza una compra y devuelve los datos actualizados en JSON
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la compra
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvestmentInput'
+      responses:
+        '200':
+          description: Compra actualizada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvestmentUpdateResponse'
+        '400':
+          description: Datos inválidos
+        '404':
+          description: Registro no encontrado
+
+  /api/sale/{id}:
+    get:
+      tags:
+        - Ventas
+      summary: Obtener datos de una venta
+      description: Devuelve los datos de una venta específica en formato JSON
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la venta
+      responses:
+        '200':
+          description: Datos de la venta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaleResponse'
+        '400':
+          description: ID inválido
+        '404':
+          description: Venta no encontrada
+
+    put:
+      tags:
+        - Ventas
+      summary: Actualizar venta (API JSON)
+      description: Actualiza una venta y devuelve los datos actualizados en JSON
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la venta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaleInput'
+      responses:
+        '200':
+          description: Venta actualizada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaleUpdateResponse'
+        '400':
+          description: Datos inválidos
+        '404':
+          description: Venta no encontrada
+
+  /sale-calculation/{id}:
+    get:
+      tags:
+        - Análisis
+      summary: Cálculo de utilidad de venta
+      description: Devuelve el desglose del cálculo de utilidad para una venta específica
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la venta
+      responses:
+        '200':
+          description: Detalles del cálculo de utilidad
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaleCalculationResponse'
+        '400':
+          description: ID inválido
+        '404':
+          description: Venta no encontrada
+
+  /api/portfolio-utility-history:
+    get:
+      tags:
+        - Análisis
+      summary: Historial de utilidad de la cartera
+      description: Devuelve el historial de utilidad de la cartera basado en snapshots
+      responses:
+        '200':
+          description: Historial de utilidad
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dates:
+                    type: array
+                    items:
+                      type: string
+                    description: Fechas de los snapshots
+                    example: ["02 Jan 2023 10:00", "03 Jan 2023 10:00"]
+                  utilities:
+                    type: array
+                    items:
+                      type: number
+                      format: float
+                    description: Utilidad de la cartera en cada snapshot
+                    example: [150.50, 200.75]
+
+# ==================== COMPONENTES ====================
+components:
+  schemas:
+    InvestmentInput:
+      type: object
+      required:
+        - ticker_id
+        - purchase_date
+        - shares
+        - purchase_price
+      properties:
+        ticker_id:
+          type: integer
+          description: ID del ticker
+          example: 1
+        purchase_date:
+          type: string
+          format: date-time
+          description: Fecha de compra
+          example: "2023-12-07T10:30"
+        shares:
+          type: number
+          format: float
+          description: Cantidad de acciones
+          example: 10.5
+        purchase_price:
+          type: number
+          format: float
+          description: Precio de compra por acción
+          example: 150.50
+        operation_cost:
+          type: number
+          format: float
+          description: Costo de operación
+          example: 5.0
+
+    InvestmentResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        ticker_id:
+          type: integer
+          example: 1
+        ticker:
+          type: string
+          example: "AAPL"
+        purchase_date:
+          type: string
+          format: date-time
+          example: "2023-12-07T10:30"
+        shares:
+          type: number
+          format: float
+          example: 10.5
+        purchase_price:
+          type: number
+          format: float
+          example: 150.50
+        operation_cost:
+          type: number
+          format: float
+          example: 5.0
+
+    InvestmentUpdateResponse:
+      allOf:
+        - $ref: '#/components/schemas/InvestmentResponse'
+        - type: object
+          properties:
+            invested_capital:
+              type: number
+              format: float
+              description: Capital invertido (shares * purchase_price)
+              example: 1580.25
+            current_price:
+              type: number
+              format: float
+              description: Precio actual del ticker
+              example: 155.75
+            current_value:
+              type: number
+              format: float
+              description: Valor actual de la inversión
+              example: 1635.375
+            profit_loss:
+              type: number
+              format: float
+              description: Ganancia o pérdida
+              example: 50.125
+
+    SaleInput:
+      type: object
+      required:
+        - ticker_id
+        - sale_date
+        - shares
+        - sale_price
+      properties:
+        ticker_id:
+          type: integer
+          description: ID del ticker
+          example: 1
+        sale_date:
+          type: string
+          format: date-time
+          description: Fecha de venta
+          example: "2023-12-07T15:30"
+        shares:
+          type: number
+          format: float
+          description: Cantidad de acciones vendidas
+          example: 5.0
+        sale_price:
+          type: number
+          format: float
+          description: Precio de venta por acción
+          example: 160.00
+        operation_cost:
+          type: number
+          format: float
+          description: Costo de operación
+          example: 3.0
+        withheld_tax:
+          type: number
+          format: float
+          description: Impuesto retenido
+          example: 10.0
+
+    SaleResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        ticker_id:
+          type: integer
+          example: 1
+        ticker:
+          type: string
+          example: "AAPL"
+        sale_date:
+          type: string
+          format: date-time
+          example: "2023-12-07T15:30"
+        shares:
+          type: number
+          format: float
+          example: 5.0
+        sale_price:
+          type: number
+          format: float
+          example: 160.00
+        operation_cost:
+          type: number
+          format: float
+          example: 3.0
+        withheld_tax:
+          type: number
+          format: float
+          example: 10.0
+
+    SaleUpdateResponse:
+      allOf:
+        - $ref: '#/components/schemas/SaleResponse'
+        - type: object
+          properties:
+            total_sale_value:
+              type: number
+              format: float
+              description: Valor total de la venta
+              example: 800.00
+            performance:
+              type: number
+              format: float
+              description: Rendimiento porcentual
+              example: 6.31
+            profit:
+              type: number
+              format: float
+              description: Utilidad de la venta
+              example: 47.50
+
+    SaleCalculationResponse:
+      type: object
+      properties:
+        ticker:
+          type: string
+          description: Nombre del ticker
+          example: "AAPL"
+        sale_date:
+          type: string
+          description: Fecha de la venta
+          example: "07 Dec 2023 15:30"
+        shares:
+          type: number
+          format: float
+          description: Acciones vendidas
+          example: 5.0
+        sale_price:
+          type: number
+          format: float
+          description: Precio de venta
+          example: 160.00
+        purchases:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                example: "01 Dec 2023 10:30"
+              shares:
+                type: number
+                format: float
+                example: 10.5
+              price:
+                type: number
+                format: float
+                example: 150.50
+              total:
+                type: number
+                format: float
+                example: 1580.25
+          description: Lista de compras previas a la venta
+        total_capital:
+          type: number
+          format: float
+          description: Capital acumulado antes de la venta
+          example: 1580.25
+        total_shares:
+          type: number
+          format: float
+          description: Acciones acumuladas antes de la venta
+          example: 10.5
+        wac:
+          type: number
+          format: float
+          description: Precio promedio ponderado (WAC)
+          example: 150.50
+        profit:
+          type: number
+          format: float
+          description: Utilidad de la venta
+          example: 47.50
+
+    Ticker:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "AAPL"
+        current_price:
+          type: number
+          format: float
+          example: 155.75
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Mensaje de error
+          example: "ID inválido"

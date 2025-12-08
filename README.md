@@ -101,6 +101,39 @@ Para ejecutar en modo desarrollo con recarga automática:
 go run main.go
 ```
 
+## 📚 Documentación de API
+
+Este proyecto incluye documentación completa de la API para facilitar el desarrollo de clientes y la migración futura a una arquitectura de API REST dedicada.
+
+### Documentos Disponibles
+
+- **[openapi.yaml](openapi.yaml)**: Especificación OpenAPI 3.0 completa de todos los endpoints
+- **[API_README.md](API_README.md)**: Guía de uso de la especificación OpenAPI, herramientas recomendadas y próximos pasos
+- **[API_EXAMPLES.md](API_EXAMPLES.md)**: Ejemplos prácticos de uso de cada endpoint en curl, JavaScript y Python
+- **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)**: Guía completa para migrar a una API REST dedicada con frontend separado
+
+### Visualizar la API
+
+Puedes visualizar y explorar la API usando:
+
+1. **Swagger Editor Online**: Visita [editor.swagger.io](https://editor.swagger.io/) y carga el archivo `openapi.yaml`
+2. **Swagger UI Local**:
+   ```bash
+   docker run -p 8080:8080 -e SWAGGER_JSON=/openapi.yaml -v ${PWD}:/usr/share/nginx/html swaggerapi/swagger-ui
+   ```
+3. **VS Code**: Instala la extensión "OpenAPI (Swagger) Editor"
+
+### Endpoints Principales
+
+- **Vistas HTML**: `/`, `/resumen`, `/compras`, `/ventas`, `/precios`, `/snapshots`
+- **Tickers**: `POST /add-ticker`, `POST /update-ticker/:id`, `POST /delete-ticker`
+- **Inversiones**: `POST /add-investment`, `PUT /api/investment/:id`, `DELETE /delete-investment`
+- **Ventas**: `POST /add-sale`, `PUT /api/sale/:id`, `DELETE /delete-sale`
+- **Análisis**: `GET /sale-calculation/:id`, `GET /api/portfolio-utility-history`
+- **Snapshots**: `POST /create-snapshot`, `POST /delete-snapshot`
+
+Para más detalles, consulta la [documentación completa de la API](API_README.md).
+
 ## Licencia
 
 Este proyecto está disponible como código abierto.
