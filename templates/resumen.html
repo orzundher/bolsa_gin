@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumen - Mis Inversiones</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Flowbite CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
+    <link href="/static/css/common.css" rel="stylesheet">
+</head>
+
+<body class="bg-gray-50 dark:bg-gray-900">
+    {{template "header" .}}
+    
+    <div class="p-4 sm:ml-64">
+        <div class="p-4 mt-14">
+
+        <!-- Toggle para mostrar/ocultar tickers con pocas acciones -->
+        <div class="mb-4 flex items-center">
+            <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="showEmptyTickers" class="sr-only peer">
+                <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Mostrar tickers con menos de 0.000001 acciones</span>
+            </label>
+        </div>
+
+        <!-- Summary Table -->
+        <div class="relative overflow-x-auto shadow-md sm:rounded-lg mb-8">
+            <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400" id="summaryTable">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Ticker</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Inversión Actual</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Costos Totales</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Valor Actual</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Rendimiento</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Posición</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Summaries}}
+                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer {{if gt .ProfitLoss 0.0}}bg-green-50 dark:bg-green-900/20{{else if lt .ProfitLoss 0.0}}bg-red-50 dark:bg-red-900/20{{end}}" data-shares="{{.TotalShares}}" onclick="window.location.href='/ticker/{{.TickerID}}'">
+                        <th scope="row" class="px-6 py-4 font-bold text-gray-900 dark:text-white whitespace-nowrap">{{.Ticker}}</th>
+                        <td class="px-6 py-4">{{printf "%.3f€" .CurrentInvestment}}</td>
+                        <td class="px-6 py-4">{{printf "%.3f€" .TotalCost}}</td>
+                        <td class="px-6 py-4">{{printf "%.3f€" .CurrentValue}}</td>
+                        <td class="px-6 py-4 font-bold {{if ge .Performance 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
+                            {{if ge .Performance 0.0}}+{{end}}{{printf "%.2f%%" .Performance}}
+                        </td>
+                        <td class="px-6 py-4 font-bold {{if gt .ProfitLoss 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
+                            {{printf "%.3f€" .ProfitLoss}}
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+
+        </div>
+    </div>
+
+    <!-- Flowbite JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+    <script src="/static/js/table-sort.js"></script>
+    
+    <script>
+        // Restaurar posición del scroll al cargar la página
+        window.addEventListener('load', function() {
+            const scrollPosition = sessionStorage.getItem('resumenScrollPosition');
+            if (scrollPosition) {
+                window.scrollTo(0, parseInt(scrollPosition));
+                sessionStorage.removeItem('resumenScrollPosition');
+            }
+        });
+
+        // Función para filtrar tickers con pocas acciones
+        function filterEmptyTickers() {
+            const showEmpty = document.getElementById('showEmptyTickers').checked;
+            const rows = document.querySelectorAll('#summaryTable tbody tr');
+            
+            rows.forEach(row => {
+                const shares = parseFloat(row.getAttribute('data-shares'));
+                if (shares < 0.000001 && !showEmpty) {
+                    row.style.display = 'none';
+                } else {
+                    row.style.display = '';
+                }
+            });
+        }
+
+        // Aplicar filtro al cargar la página
+        window.addEventListener('load', function() {
+            filterEmptyTickers();
+        });
+
+        // Aplicar filtro cuando cambie el toggle
+        document.getElementById('showEmptyTickers').addEventListener('change', filterEmptyTickers);
+    </script>
+
+</body>
+
+</html>

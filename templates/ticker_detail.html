@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalle de {{.Ticker.Name}}</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Flowbite CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
+    <link href="/static/css/common.css" rel="stylesheet">
+</head>
+
+<body class="bg-gray-50 dark:bg-gray-900">
+    {{template "header" .}}
+    
+    <div class="p-4 sm:ml-64">
+        <div class="p-4 mt-14">
+
+            <!-- Header con nombre del ticker y botón de volver -->
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                    Detalle de <span class="text-blue-600 dark:text-blue-400">{{.Ticker.Name}}</span>
+                </h1>
+                <a href="/resumen" class="text-white bg-gray-600 hover:bg-gray-700 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-gray-700 dark:hover:bg-gray-600 focus:outline-none dark:focus:ring-gray-800">
+                    ← Volver
+                </a>
+            </div>
+
+            <!-- Resumen -->
+            <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Precio Actual</h4>
+                    <h3 class="text-xl font-bold text-blue-600 dark:text-blue-400">{{printf "%.4f€" .Ticker.CurrentPrice}}</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Total Comprado</h4>
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">{{printf "%.3f€" .TotalInvested}}</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Total Vendido</h4>
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">{{printf "%.3f€" .TotalSold}}</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Comisiones Totales</h4>
+                    <h3 class="text-xl font-bold text-red-600 dark:text-red-400">{{printf "%.3f€" .TotalCosts}}</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">En Cartera</h4>
+                    <h3 class="text-xl font-bold text-blue-600 dark:text-blue-400">{{printf "%.6f" .SharesInPortfolio}}</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Costo Ponderado</h4>
+                    <h3 class="text-xl font-bold text-purple-600 dark:text-purple-400">{{printf "%.4f€" .PortfolioWAC}}</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Rendimiento</h4>
+                    <h3 class="text-xl font-bold {{if ge .WACPerformance 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">{{if ge .WACPerformance 0.0}}+{{end}}{{printf "%.2f" .WACPerformance}}%</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Utilidad Posible</h4>
+                    <h3 class="text-xl font-bold {{if ge .Utilidad 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">{{if ge .Utilidad 0.0}}+{{end}}{{printf "%.2f€" .Utilidad}}</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Utilidad Ventas</h4>
+                    <h3 class="text-xl font-bold {{if ge .TotalSaleUtility 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">{{if ge .TotalSaleUtility 0.0}}+{{end}}{{printf "%.2f€" .TotalSaleUtility}}</h3>
+                </div>
+            </div>
+
+            {{if .PriceChartDates}}
+            <!-- Gráfico de Evolución de Precios -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8 p-6">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Evolución del Precio</h2>
+                <div id="priceChart"></div>
+            </div>
+            {{end}}
+
+            <!-- Tabla de Compras -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8">
+                <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Compras</h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Costo total de compras: {{printf "%.3f€" .TotalCostBuy}}</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                            <tr>
+                                <th scope="col" class="px-4 py-3">Fecha</th>
+                                <th scope="col" class="px-4 py-3">Acciones</th>
+                                <th scope="col" class="px-4 py-3">Precio Compra</th>
+                                <th scope="col" class="px-4 py-3">Costo Op.</th>
+                                <th scope="col" class="px-4 py-3">Capital Invertido</th>
+                                <th scope="col" class="px-4 py-3">Valor Actual</th>
+                                <th scope="col" class="px-4 py-3">Rendimiento</th>
+                                <th scope="col" class="px-4 py-3">Utilidad</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .Investments}}
+                            <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                <td class="px-4 py-3">{{.PurchaseDate}}</td>
+                                <td class="px-4 py-3">{{printf "%.6f" .Shares}}</td>
+                                <td class="px-4 py-3">{{printf "%.4f€" .PurchasePrice}}</td>
+                                <td class="px-4 py-3">{{printf "%.3f€" .OperationCost}}</td>
+                                <td class="px-4 py-3">{{printf "%.3f€" .InvestedCapital}}</td>
+                                <td class="px-4 py-3">{{printf "%.3f€" .CurrentValue}}</td>
+                                <td class="px-4 py-3 {{if gt .Performance 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}} font-semibold">
+                                    {{printf "%.2f%%" .Performance}}
+                                </td>
+                                <td class="px-4 py-3 {{if gt .ProfitLoss 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}} font-semibold">
+                                    {{printf "%.3f€" .ProfitLoss}}
+                                </td>
+                            </tr>
+                            {{else}}
+                            <tr>
+                                <td colspan="8" class="px-4 py-3 text-center text-gray-500 dark:text-gray-400">No hay compras registradas</td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tabla de Ventas -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+                <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Ventas</h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Costo total de ventas: {{printf "%.3f€" .TotalCostSell}}</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                            <tr>
+                                <th scope="col" class="px-4 py-3">Fecha</th>
+                                <th scope="col" class="px-4 py-3">Acciones</th>
+                                <th scope="col" class="px-4 py-3">Precio Venta</th>
+                                <th scope="col" class="px-4 py-3">Costo Op.</th>
+                                <th scope="col" class="px-4 py-3">Impuesto Retenido</th>
+                                <th scope="col" class="px-4 py-3">Total Venta</th>
+                                <th scope="col" class="px-4 py-3">Rendimiento</th>
+                                <th scope="col" class="px-4 py-3">Utilidad</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .Sales}}
+                            <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                <td class="px-4 py-3">{{.SaleDate}}</td>
+                                <td class="px-4 py-3">{{printf "%.6f" .Shares}}</td>
+                                <td class="px-4 py-3">{{printf "%.4f€" .SalePrice}}</td>
+                                <td class="px-4 py-3">{{printf "%.3f€" .OperationCost}}</td>
+                                <td class="px-4 py-3">{{printf "%.3f€" .WithheldTax}}</td>
+                                <td class="px-4 py-3 font-semibold">{{printf "%.3f€" .TotalSaleValue}}</td>
+                                <td class="px-4 py-3 {{if ge .SalePerformance 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}} font-semibold">
+                                    {{if ge .SalePerformance 0.0}}+{{end}}{{printf "%.2f%%" .SalePerformance}}
+                                </td>
+                                <td class="px-4 py-3 {{if ge .SaleUtility 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}} font-semibold">
+                                    {{if ge .SaleUtility 0.0}}+{{end}}{{printf "%.2f€" .SaleUtility}}
+                                </td>
+                            </tr>
+                            {{else}}
+                            <tr>
+                                <td colspan="8" class="px-4 py-3 text-center text-gray-500 dark:text-gray-400">No hay ventas registradas</td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ApexCharts -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <!-- Flowbite JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+
+    {{if .PriceChartDates}}
+    <script>
+        // Datos del gráfico desde el backend
+        const chartDates = [{{range $index, $date := .PriceChartDates}}{{if $index}},{{end}}"{{$date}}"{{end}}];
+        const chartPrices = [{{range $index, $price := .PriceChartValues}}{{if $index}},{{end}}{{$price}}{{end}}];
+        
+        // Datos de compras
+        const purchaseDates = [{{range $index, $date := .PurchaseChartDates}}{{if $index}},{{end}}"{{$date}}"{{end}}];
+        const purchasePrices = [{{range $index, $price := .PurchaseChartPrices}}{{if $index}},{{end}}{{$price}}{{end}}];
+        
+        // Datos de ventas
+        const saleDates = [{{range $index, $date := .SaleChartDates}}{{if $index}},{{end}}"{{$date}}"{{end}}];
+        const salePrices = [{{range $index, $price := .SaleChartPrices}}{{if $index}},{{end}}{{$price}}{{end}}];
+
+        // Debug: mostrar datos recibidos
+        console.log('Chart Dates:', chartDates);
+        console.log('Chart Prices:', chartPrices);
+        console.log('Purchase Dates:', purchaseDates);
+        console.log('Purchase Prices:', purchasePrices);
+        console.log('Sale Dates:', saleDates);
+        console.log('Sale Prices:', salePrices);
+
+        // Verificar que tenemos datos válidos antes de renderizar
+        if (chartDates.length === 0 || chartPrices.length === 0) {
+            console.warn('No hay datos de precios para mostrar en el gráfico');
+            document.querySelector("#priceChart").innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 py-8">No hay datos de snapshots disponibles</p>';
+        } else {
+
+        // Función para convertir fecha "DD Mon YYYY HH:MM" a timestamp
+        function parseDate(dateStr) {
+            try {
+                const months = {
+                    'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+                    'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+                };
+                const parts = dateStr.split(' ');
+                if (parts.length < 4) {
+                    console.error('Invalid date format (too few parts):', dateStr, 'parts:', parts);
+                    return null;
+                }
+                const day = parseInt(parts[0]);
+                const month = months[parts[1]];
+                const year = parseInt(parts[2]);
+                const time = parts[3] ? parts[3].split(':') : ['0', '0'];
+                const hour = parseInt(time[0]);
+                const minute = parseInt(time[1]);
+                
+                if (isNaN(day) || month === undefined || isNaN(year) || isNaN(hour) || isNaN(minute)) {
+                    console.error('Invalid date components:', {dateStr, day, month, year, hour, minute});
+                    return null;
+                }
+                
+                const timestamp = new Date(year, month, day, hour, minute).getTime();
+                console.log('Parsed date:', dateStr, '→', timestamp, '→', new Date(timestamp));
+                return timestamp;
+            } catch (error) {
+                console.error('Error parsing date:', dateStr, error);
+                return null;
+            }
+        }
+
+        // Preparar series para el gráfico
+        const series = [{
+            name: 'Precio',
+            type: 'line',
+            data: chartPrices.map((price, index) => ({
+                x: parseDate(chartDates[index]),
+                y: price
+            })).filter(point => point.x !== null && !isNaN(point.y))
+        }];
+
+        // Agregar compras si existen
+        if (purchaseDates.length > 0) {
+            const purchaseData = purchasePrices.map((price, index) => ({
+                x: parseDate(purchaseDates[index]),
+                y: price
+            })).filter(point => point.x !== null && !isNaN(point.y));
+            
+            if (purchaseData.length > 0) {
+                series.push({
+                    name: 'Compras',
+                    type: 'scatter',
+                    data: purchaseData
+                });
+            }
+        }
+
+        // Agregar ventas si existen
+        if (saleDates.length > 0) {
+            const saleData = salePrices.map((price, index) => ({
+                x: parseDate(saleDates[index]),
+                y: price
+            })).filter(point => point.x !== null && !isNaN(point.y));
+            
+            if (saleData.length > 0) {
+                series.push({
+                    name: 'Ventas',
+                    type: 'scatter',
+                    data: saleData
+                });
+            }
+        }
+
+        // Agregar línea horizontal del WAC (Precio de Compra Ponderado)
+        const wacValue = {{.PortfolioWAC}};
+        if (wacValue > 0) {
+            // Encontrar la fecha mínima y máxima de todas las series
+            let allDates = [];
+            
+            // Agregar fechas de snapshots
+            chartDates.forEach(date => allDates.push(parseDate(date)));
+            
+            // Agregar fechas de compras
+            purchaseDates.forEach(date => allDates.push(parseDate(date)));
+            
+            // Agregar fechas de ventas
+            saleDates.forEach(date => allDates.push(parseDate(date)));
+            
+            // Filtrar nulls y encontrar min/max
+            allDates = allDates.filter(d => d !== null);
+            
+            if (allDates.length > 0) {
+                const minDate = Math.min(...allDates);
+                const maxDate = Math.max(...allDates);
+                
+                // Crear puntos para la línea horizontal del WAC
+                const wacData = [
+                    { x: minDate, y: wacValue },
+                    { x: maxDate, y: wacValue }
+                ];
+                
+                series.push({
+                    name: 'Ponderado',
+                    type: 'line',
+                    data: wacData
+                });
+            }
+        }
+
+        // Configuración del gráfico
+        const options = {
+            series: series,
+            chart: {
+                type: 'line',
+                height: 400,
+                toolbar: {
+                    show: true
+                },
+                zoom: {
+                    enabled: true
+                }
+            },
+            dataLabels: {
+                enabled: false
+            },
+            stroke: {
+                curve: 'smooth',
+                width: 3
+            },
+            colors: ['#3B82F6', '#10B981', '#EF4444', '#9333EA'], // Azul: precio, Verde: compras, Rojo: ventas, Morado: Ponderado
+            markers: {
+                size: 4, // Tamaño uniforme para todos los puntos
+                strokeWidth: 0, // Sin borde blanco
+                hover: {
+                    size: 6
+                }
+            },
+            xaxis: {
+                type: 'datetime',
+                labels: {
+                    datetimeUTC: false,
+                    format: 'dd MMM yyyy',
+                    style: {
+                        colors: '#9CA3AF'
+                    }
+                }
+            },
+            yaxis: {
+                labels: {
+                    formatter: function(value) {
+                        return value.toFixed(4) + '€';
+                    },
+                    style: {
+                        colors: '#9CA3AF'
+                    }
+                }
+            },
+            tooltip: {
+                theme: 'dark',
+                x: {
+                    format: 'dd MMM yyyy HH:mm'
+                },
+                y: {
+                    formatter: function(value) {
+                        return value.toFixed(4) + '€';
+                    }
+                }
+            },
+            legend: {
+                show: true,
+                position: 'top',
+                horizontalAlign: 'center',
+                labels: {
+                    colors: '#9CA3AF'
+                },
+                markers: {
+                    width: 8,
+                    height: 8,
+                    strokeWidth: 0,
+                    radius: 4
+                }
+            },
+            grid: {
+                borderColor: '#374151'
+            }
+        };
+
+        // Renderizar el gráfico
+        const chart = new ApexCharts(document.querySelector("#priceChart"), options);
+        chart.render();
+        console.log('Chart rendered successfully');
+        } // Cierre del else
+    </script>
+    {{end}}
+
+    <script>
+        // Volver a resumen con la tecla ESC
+        // Usar keyup y DOMContentLoaded para asegurar que funcione correctamente
+        document.addEventListener('DOMContentLoaded', function() {
+            document.addEventListener('keyup', function(event) {
+                if (event.key === 'Escape' || event.keyCode === 27) {
+                    // Prevenir comportamiento por defecto
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.location.href = '/resumen';
+                }
+            }, true); // true = capture phase, se ejecuta antes que otros listeners
+        });
+    </script>
+
+</body>
+
+</html>

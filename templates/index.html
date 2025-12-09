@@ -5,69 +5,231 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mis Inversiones</title>
-    <!-- Bootstrap CSS from CDN -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap JS Bundle with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Flowbite CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
     <link href="/static/css/common.css" rel="stylesheet">
 </head>
 
-<body>
+<body class="bg-gray-50 dark:bg-gray-900">
     {{template "header" .}}
     
-    <div class="container">
+    <div class="p-4 sm:ml-64">
+        <div class="p-4 mt-14">
 
-        <div class="mt-4 mb-4 p-3 bg-light rounded">
-            <div class="row text-center">
-                <div class="col-md-4">
-                    <h4>Volumen de Cartera</h4>
-                    <h3 class="text-primary">{{printf "%.3f€" .TotalCapital}}</h3>
-                </div>
-                <div class="col-md-4">
-                    <h4>Costos de Operación</h4>
-                    <h3 class="text-secondary">{{printf "%.3f€" .TotalOperationCost}}</h3>
-                </div>
-                <div class="col-md-4">
-                    <h4>Utilidad Neta Actual</h4>
-                    <h3 class="{{if gt .NetProfitLoss 0.0}}profit{{else}}loss{{end}}">{{printf "%.3f€" .NetProfitLoss}}
-                    </h3>
-                </div>
+        <!-- Metrics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-6 mb-8">
+            <!-- Número de Posiciones -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Posiciones</h4>
+                <h3 class="text-3xl font-bold text-blue-600 dark:text-blue-400">{{.NumPositions}}</h3>
+            </div>
+
+            <!-- Costos de Operación -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Costos de Operación</h4>
+                <h3 class="text-3xl font-bold text-gray-600 dark:text-gray-300">{{printf "%.3f€" .TotalOperationCost}}</h3>
+            </div>
+
+            <!-- Utilidad Ventas -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Utilidad Ventas</h4>
+                <h3 class="text-3xl font-bold {{if ge .TotalSaleUtility 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
+                    {{if ge .TotalSaleUtility 0.0}}+{{end}}{{printf "%.2f€" .TotalSaleUtility}}
+                </h3>
+            </div>
+
+            <!-- Rendimiento Cartera -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Rendimiento Cartera</h4>
+                <h3 class="text-3xl font-bold {{if ge .PortfolioPerformance 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
+                    {{if ge .PortfolioPerformance 0.0}}+{{end}}{{printf "%.2f%%" .PortfolioPerformance}}
+                </h3>
+            </div>
+
+            <!-- Utilidad Cartera -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Utilidad Cartera</h4>
+                <h3 class="text-3xl font-bold {{if ge .PortfolioUtility 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
+                    {{if ge .PortfolioUtility 0.0}}+{{end}}{{printf "%.2f€" .PortfolioUtility}}
+                </h3>
+            </div>
+
+            <!-- Valor de Salida -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Valor de Salida</h4>
+                <h3 class="text-3xl font-bold {{if ge .ExitValue 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
+                    {{if ge .ExitValue 0.0}}+{{end}}{{printf "%.2f€" .ExitValue}}
+                </h3>
             </div>
         </div>
 
-        <h2 class="mt-5 mb-3">Resumen por Ticker</h2>
-        <div class="table-responsive mb-5">
-            <table class="table table-striped table-hover table-sm" id="summaryTable">
-                <thead class="table-dark">
-                    <tr>
-                        <th class="sortable">Ticker</th>
-                        <th class="sortable">Acciones</th>
-                        <th class="sortable">Capital Invertido</th>
-                        <th class="sortable">Costos Totales</th>
-                        <th class="sortable">Valor Actual</th>
-                        <th class="sortable">Utilidad (+/-)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{range .Summaries}}
-                    <tr class="{{if gt .ProfitLoss 0.0}}table-success{{else if lt .ProfitLoss 0.0}}table-danger{{end}}">
-                        <td><strong>{{.Ticker}}</strong></td>
-                        <td>{{printf "%.2f" .TotalShares}}</td>
-                        <td>{{printf "%.3f€" .InvestedCapital}}</td>
-                        <td>{{printf "%.3f€" .TotalCost}}</td>
-                        <td>{{printf "%.3f€" .CurrentValue}}</td>
-                        <td class="{{if gt .ProfitLoss 0.0}}profit{{else}}loss{{end}}">{{printf "%.3f€" .ProfitLoss}}
-                        </td>
-                    </tr>
-                    {{end}}
-                </tbody>
-            </table>
+        <!-- Gráfico de Evolución de Utilidad de la Cartera -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8 p-6">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Evolución de Utilidad de la Cartera</h2>
+            <div id="portfolioUtilityChart"></div>
         </div>
 
+        </div>
     </div>
 
+    <!-- ApexCharts -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <!-- Flowbite JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
     <script src="/static/js/table-sort.js"></script>
     <script src="/static/js/home.js"></script>
+
+    <script>
+        // Cargar datos del historial de utilidad de la cartera
+        fetch('/api/portfolio-utility-history')
+            .then(response => response.json())
+            .then(data => {
+                if (data.dates.length === 0) {
+                    document.getElementById('portfolioUtilityChart').innerHTML = 
+                        '<p class="text-center text-gray-500 dark:text-gray-400 py-8">No hay snapshots disponibles para mostrar el gráfico</p>';
+                    return;
+                }
+
+                // Función para convertir fecha "DD Mon YYYY HH:MM" a timestamp
+                function parseDate(dateStr) {
+                    try {
+                        const months = {
+                            'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+                            'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+                        };
+                        const parts = dateStr.split(' ');
+                        if (parts.length < 4) {
+                            console.error('Invalid date format:', dateStr);
+                            return null;
+                        }
+                        const day = parseInt(parts[0]);
+                        const month = months[parts[1]];
+                        const year = parseInt(parts[2]);
+                        const time = parts[3] ? parts[3].split(':') : ['0', '0'];
+                        const hour = parseInt(time[0]);
+                        const minute = parseInt(time[1]);
+                        
+                        if (isNaN(day) || month === undefined || isNaN(year) || isNaN(hour) || isNaN(minute)) {
+                            console.error('Invalid date components:', {dateStr, day, month, year, hour, minute});
+                            return null;
+                        }
+                        
+                        return new Date(year, month, day, hour, minute).getTime();
+                    } catch (error) {
+                        console.error('Error parsing date:', dateStr, error);
+                        return null;
+                    }
+                }
+
+                // Preparar datos para el gráfico
+                const chartData = data.dates.map((date, index) => ({
+                    x: parseDate(date),
+                    y: data.utilities[index]
+                })).filter(point => point.x !== null && !isNaN(point.y));
+
+                // Configuración del gráfico
+                const options = {
+                    series: [{
+                        name: 'Utilidad de la Cartera',
+                        data: chartData
+                    }],
+                    chart: {
+                        type: 'line',
+                        height: 350,
+                        toolbar: {
+                            show: true
+                        },
+                        zoom: {
+                            enabled: true
+                        }
+                    },
+                    dataLabels: {
+                        enabled: false
+                    },
+                    stroke: {
+                        curve: 'smooth',
+                        width: 3
+                    },
+                    colors: ['#10B981'], // Verde por defecto
+                    markers: {
+                        size: 5,
+                        strokeWidth: 0,
+                        hover: {
+                            size: 7
+                        }
+                    },
+                    xaxis: {
+                        type: 'datetime',
+                        labels: {
+                            datetimeUTC: false,
+                            format: 'dd MMM yyyy',
+                            style: {
+                                colors: '#9CA3AF'
+                            }
+                        }
+                    },
+                    yaxis: {
+                        labels: {
+                            formatter: function(value) {
+                                return value.toFixed(2) + '€';
+                            },
+                            style: {
+                                colors: '#9CA3AF'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        theme: 'dark',
+                        x: {
+                            format: 'dd MMM yyyy HH:mm'
+                        },
+                        y: {
+                            formatter: function(value) {
+                                const sign = value >= 0 ? '+' : '';
+                                return sign + value.toFixed(2) + '€';
+                            }
+                        }
+                    },
+                    legend: {
+                        show: true,
+                        position: 'top',
+                        horizontalAlign: 'center',
+                        labels: {
+                            colors: '#9CA3AF'
+                        }
+                    },
+                    grid: {
+                        borderColor: '#374151'
+                    },
+                    annotations: {
+                        yaxis: [{
+                            y: 0,
+                            borderColor: '#6B7280',
+                            strokeDashArray: 5,
+                            label: {
+                                borderColor: '#6B7280',
+                                style: {
+                                    color: '#fff',
+                                    background: '#6B7280'
+                                },
+                                text: 'Punto de equilibrio'
+                            }
+                        }]
+                    }
+                };
+
+                // Renderizar el gráfico
+                const chart = new ApexCharts(document.querySelector("#portfolioUtilityChart"), options);
+                chart.render();
+            })
+            .catch(error => {
+                console.error('Error cargando datos del gráfico:', error);
+                document.getElementById('portfolioUtilityChart').innerHTML = 
+                    '<p class="text-center text-red-500 dark:text-red-400 py-8">Error al cargar los datos del gráfico</p>';
+            });
+    </script>
 
 </body>
 

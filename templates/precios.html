@@ -5,78 +5,278 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestión de Tickers</title>
-    <!-- Bootstrap CSS from CDN -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap JS Bundle with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Flowbite CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
     <link href="/static/css/common.css" rel="stylesheet">
 </head>
 
-<body>
+<body class="bg-gray-50 dark:bg-gray-900">
     {{template "header" .}}
     
-    <div class="container">
+    <div class="p-4 sm:ml-64">
+        <div class="p-4 mt-14">
 
-        <div class="row mb-4">
-            <div class="col-lg-12">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Agregar Nuevo Ticker</h5>
-                        <form action="/add-ticker" method="post">
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label for="name" class="form-label">Símbolo</label>
-                                    <input type="text" name="name" id="name" class="form-control" placeholder="Ej: AAPL" required>
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="current_price" class="form-label">Precio Actual</label>
-                                    <input type="number" step="any" name="current_price" id="current_price" class="form-control" placeholder="0.00">
-                                </div>
-                            </div>
-                            <button type="submit" class="btn btn-success mt-3">Agregar Ticker</button>
-                        </form>
+        <!-- Form Card -->
+        <div class="mb-8">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                <h5 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Agregar Nuevo Ticker</h5>
+                <form action="/add-ticker" method="post">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="name" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Símbolo</label>
+                            <input type="text" name="name" id="name" placeholder="Ej: AAPL" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" required>
+                        </div>
+                        <div>
+                            <label for="current_price" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Precio Actual</label>
+                            <input type="number" step="any" name="current_price" id="current_price" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                        </div>
                     </div>
-                </div>
+                    <button type="submit" class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">Agregar Ticker</button>
+                </form>
             </div>
         </div>
 
-        <h2 class="mb-3">Tickers Registrados</h2>
-        <div class="table-responsive">
-            <table class="table table-striped table-hover table-sm" id="tickersTable">
-                <thead class="table-dark">
+        <!-- Table Header with Snapshot Button -->
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Tickers Registrados</h2>
+            <button type="button" id="snapshotBtn" data-modal-target="snapshot-confirm-modal" data-modal-toggle="snapshot-confirm-modal" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-blue-800">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Snapshot
+            </button>
+        </div>
+        <div class="relative overflow-x-auto shadow-md sm:rounded-lg">
+            <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400" id="tickersTable">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                     <tr>
-                        <th class="sortable">Símbolo</th>
-                        <th class="sortable">Precio Actual</th>
-                        <th>Acciones</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Símbolo</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Precio Actual</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Cambio Snapshots</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Última Actualización</th>
+                        <th scope="col" class="px-6 py-3">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {{range .Tickers}}
-                    <tr>
-                        <form action="/update-ticker/{{.ID}}" method="post" class="d-flex align-items-center">
-                            <td>
-                                <input type="text" name="name" value="{{.Name}}" class="form-control form-control-sm">
-                            </td>
-                            <td>
-                                <input type="number" step="any" name="current_price" value="{{printf "%.4f" .CurrentPrice}}" class="form-control form-control-sm">
-                            </td>
-                            <td class="text-nowrap">
-                                <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
-                        </form>
-                                <form action="/delete-ticker" method="post" style="display: inline;" onsubmit="return confirm('¿Eliminar este ticker? Solo es posible si no tiene compras/ventas asociadas.');">
-                                    <input type="hidden" name="id" value="{{.ID}}">
-                                    <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
-                                </form>
-                            </td>
+                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer" data-modal-target="edit-modal-{{.ID}}" data-modal-toggle="edit-modal-{{.ID}}" onclick="focusPrice({{.ID}})">
+                        <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{{.Name}}</th>
+                        <td class="px-6 py-4">{{printf "%.4f€" .CurrentPrice}}</td>
+                        <td class="px-6 py-4">
+                            {{if .HasSnapshotChange}}
+                                {{if gt .SnapshotChange 0.0}}
+                                    <span class="inline-flex items-center text-green-600 dark:text-green-400 font-semibold">
+                                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                        +{{printf "%.2f" .SnapshotChange}}%
+                                    </span>
+                                {{else if lt .SnapshotChange 0.0}}
+                                    <span class="inline-flex items-center text-red-600 dark:text-red-400 font-semibold">
+                                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                        {{printf "%.2f" .SnapshotChange}}%
+                                    </span>
+                                {{else}}
+                                    <span class="text-gray-500 dark:text-gray-400">0.00%</span>
+                                {{end}}
+                            {{else}}
+                                <span class="text-gray-400 dark:text-gray-500">—</span>
+                            {{end}}
+                        </td>
+                        <td class="px-6 py-4">{{.UpdatedAt}}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <button id="dropdownTickerButton-{{.ID}}" data-dropdown-toggle="dropdownTicker-{{.ID}}" class="inline-flex items-center p-2 text-sm font-medium text-center text-gray-500 hover:text-gray-800 rounded-lg focus:outline-none dark:text-gray-400 dark:hover:text-gray-100" type="button" onclick="event.stopPropagation();">
+                                <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 4 15">
+                                    <path d="M3.5 1.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Zm0 6.041a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Zm0 5.959a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z"/>
+                                </svg>
+                            </button>
+                            <div id="dropdownTicker-{{.ID}}" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 dark:divide-gray-600">
+                                <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownTickerButton-{{.ID}}">
+                                    <li>
+                                        <form action="/delete-ticker" method="post" onsubmit="return confirm('¿Eliminar este ticker? Solo es posible si no tiene compras/ventas asociadas.');">
+                                            <input type="hidden" name="id" value="{{.ID}}">
+                                            <button type="submit" class="flex w-full items-center px-4 py-2 text-red-600 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-red-500 dark:hover:text-red-400">
+                                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                                                </svg>
+                                                Eliminar
+                                            </button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </div>
+                        </td>
                     </tr>
                     {{end}}
                 </tbody>
             </table>
         </div>
 
+        </div>
     </div>
 
+    <!-- Modal de confirmación para snapshot -->
+    <div id="snapshot-confirm-modal" tabindex="-1" class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full">
+        <div class="relative p-4 w-full max-w-md max-h-full">
+            <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
+                <button type="button" class="absolute top-3 end-2.5 text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" data-modal-hide="snapshot-confirm-modal">
+                    <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                    </svg>
+                    <span class="sr-only">Cerrar</span>
+                </button>
+                <div class="p-4 md:p-5 text-center">
+                    <svg class="mx-auto mb-4 text-gray-400 w-12 h-12 dark:text-gray-200" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 11V6m0 8h.01M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                    </svg>
+                    <h3 class="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">¿Crear un snapshot de todos los precios actuales?</h3>
+                    <button id="confirm-snapshot-btn" type="button" class="text-white bg-blue-600 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800 font-medium rounded-lg text-sm inline-flex items-center px-5 py-2.5 text-center">
+                        Sí, crear snapshot
+                    </button>
+                    <button data-modal-hide="snapshot-confirm-modal" type="button" class="py-2.5 px-5 ms-3 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modales de edición -->
+    {{range .Tickers}}
+    <div id="edit-modal-{{.ID}}" tabindex="-1" aria-hidden="true" class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full">
+        <div class="relative p-4 w-full max-w-md max-h-full">
+            <!-- Modal content -->
+            <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
+                <!-- Modal header -->
+                <div class="flex items-center justify-between p-4 md:p-5 border-b rounded-t dark:border-gray-600">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                        Actualizar Ticker
+                    </h3>
+                    <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" data-modal-toggle="edit-modal-{{.ID}}">
+                        <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                        </svg>
+                        <span class="sr-only">Cerrar</span>
+                    </button>
+                </div>
+                <!-- Modal body -->
+                <form action="/update-ticker/{{.ID}}" method="post" class="p-4 md:p-5">
+                    <div class="grid gap-4 mb-4">
+                        <div>
+                            <label for="name-{{.ID}}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Símbolo</label>
+                            <input type="text" name="name" id="name-{{.ID}}" value="{{.Name}}" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                        </div>
+                        <div>
+                            <label for="price-{{.ID}}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Precio Actual</label>
+                            <input type="number" step="any" name="current_price" id="price-{{.ID}}" value="{{printf "%.4f" .CurrentPrice}}" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2">
+                        <button type="button" data-modal-toggle="edit-modal-{{.ID}}" class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600">Cancelar</button>
+                        <button type="submit" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {{end}}
+
+    <!-- Flowbite JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
     <script src="/static/js/table-sort.js"></script>
+    
+    <script>
+        // Guardar posición del scroll antes de enviar formulario
+        document.querySelectorAll('form[action^="/update-ticker"]').forEach(form => {
+            form.addEventListener('submit', function() {
+                sessionStorage.setItem('scrollPosition', window.scrollY);
+            });
+        });
+        
+        // Restaurar posición del scroll al cargar la página
+        window.addEventListener('load', function() {
+            const scrollPosition = sessionStorage.getItem('scrollPosition');
+            if (scrollPosition) {
+                window.scrollTo(0, parseInt(scrollPosition));
+                sessionStorage.removeItem('scrollPosition');
+            }
+        });
+
+        function focusPrice(id) {
+            setTimeout(() => {
+                const input = document.getElementById('price-' + id);
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }, 150); // Aumentado a 150ms para dar tiempo a Flowbite a actualizar aria-hidden
+        }
+
+        // Función para crear un snapshot de precios
+        document.addEventListener('DOMContentLoaded', function() {
+            const confirmSnapshotBtn = document.getElementById('confirm-snapshot-btn');
+            
+            if (confirmSnapshotBtn) {
+                console.log('Confirm snapshot button found');
+                
+                // Confirmar creación de snapshot
+                confirmSnapshotBtn.addEventListener('click', async function(e) {
+                    console.log('Confirm button clicked');
+                    e.preventDefault();
+                    
+                    // Cerrar el modal correctamente
+                    const modal = document.getElementById('snapshot-confirm-modal');
+                    if (modal) {
+                        modal.classList.add('hidden');
+                        modal.classList.remove('flex');
+                        modal.setAttribute('aria-hidden', 'true');
+                        
+                        // Remover el backdrop
+                        const backdrop = document.querySelector('[modal-backdrop]');
+                        if (backdrop) {
+                            backdrop.remove();
+                        }
+                        
+                        // Restaurar scroll del body
+                        document.body.classList.remove('overflow-hidden');
+                    }
+
+                    console.log('Sending snapshot request to backend...');
+                    
+                    try {
+                        const response = await fetch('/create-snapshot', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            }
+                        });
+
+                        console.log('Response received:', response.status);
+                        const data = await response.json();
+                        console.log('Response data:', data);
+
+                        if (data.success) {
+                            alert(`✓ ${data.message}\nSnapshot ID: ${data.snapshotID}`);
+                            // Recargar la página para ver el nuevo snapshot
+                            window.location.reload();
+                        } else {
+                            alert(`✗ Error: ${data.message}`);
+                        }
+                    } catch (error) {
+                        console.error('Error al crear snapshot:', error);
+                        alert('✗ Error al crear el snapshot. Por favor, intenta de nuevo.');
+                    }
+                });
+            } else {
+                console.error('Confirm snapshot button not found!');
+            }
+        });
+    </script>
 
 </body>
 
