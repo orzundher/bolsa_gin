@@ -137,3 +137,5 @@ Para más detalles, consulta la [documentación completa de la API](API_README.m
 ## Licencia
 
 Este proyecto está disponible como código abierto.
+
+Detención por abuso sexual en el ámbito familiar

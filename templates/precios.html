@@ -16,6 +16,7 @@
             const modal = document.getElementById('add-ticker-modal');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
+            modal.removeAttribute('aria-hidden');
             // Reset form
             document.getElementById('add-name').value = '';
             document.getElementById('add-price').value = '';
@@ -25,9 +26,69 @@
         }
         
         function closeAddTickerModal() {
+            // Remove focus from any element inside the modal before hiding it
+            if (document.activeElement && document.getElementById('add-ticker-modal').contains(document.activeElement)) {
+                document.activeElement.blur();
+            }
             const modal = document.getElementById('add-ticker-modal');
             modal.classList.add('hidden');
             modal.classList.remove('flex');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+        
+        // Cerrar modal con tecla Escape
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                // Cerrar modal de agregar ticker
+                const addModal = document.getElementById('add-ticker-modal');
+                if (addModal && !addModal.classList.contains('hidden')) {
+                    closeAddTickerModal();
+                    return;
+                }
+                // Cerrar cualquier modal de edición abierto
+                document.querySelectorAll('[id^="edit-modal-"]').forEach(modal => {
+                    if (!modal.classList.contains('hidden')) {
+                         // Extract ID from modal ID string "edit-modal-{id}"
+                        const id = modal.id.replace('edit-modal-', '');
+                        closeEditModal(id);
+                    }
+                });
+            }
+        });
+        
+        // Función para enfocar el campo de precio al hacer clic en una fila
+        function focusPrice(id) {
+            setTimeout(() => {
+                const input = document.getElementById('price-' + id);
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }, 150);
+        }
+        
+        // Funciones para el modal de edición de ticker
+        function openEditModal(id) {
+            const modal = document.getElementById('edit-modal-' + id);
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                modal.removeAttribute('aria-hidden');
+                focusPrice(id);
+            }
+        }
+        
+        function closeEditModal(id) {
+            const modal = document.getElementById('edit-modal-' + id);
+            if (modal) {
+                // Remove focus from any element inside the modal before hiding it
+                if (document.activeElement && modal.contains(document.activeElement)) {
+                    document.activeElement.blur();
+                }
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                modal.setAttribute('aria-hidden', 'true');
+            }
         }
     </script>
 </head>
@@ -62,6 +123,7 @@
                 <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                     <tr>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Símbolo</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Yahoo Ticker</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Precio Actual</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Cambio Snapshots</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Última Actualización</th>
@@ -70,8 +132,9 @@
                 </thead>
                 <tbody>
                     {{range .Tickers}}
-                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer" data-modal-target="edit-modal-{{.ID}}" data-modal-toggle="edit-modal-{{.ID}}" onclick="focusPrice({{.ID}})">
+                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer" onclick="openEditModal({{.ID}})">
                         <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{{.Name}}</th>
+                        <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{if .YahooFinanceTicker}}{{.YahooFinanceTicker}}{{else}}—{{end}}</td>
                         <td class="px-6 py-4">{{printf "%.4f€" .CurrentPrice}}</td>
                         <td class="px-6 py-4">
                             {{if .HasSnapshotChange}}
@@ -207,7 +270,7 @@
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
                         Actualizar Ticker
                     </h3>
-                    <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" data-modal-toggle="edit-modal-{{.ID}}">
+                    <button type="button" onclick="closeEditModal({{.ID}})" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white">
                         <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
                             <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
                         </svg>
@@ -231,7 +294,7 @@
                         </div>
                     </div>
                     <div class="flex justify-end gap-2">
-                        <button type="button" data-modal-toggle="edit-modal-{{.ID}}" class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600">Cancelar</button>
+                        <button type="button" onclick="closeEditModal({{.ID}})" class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600">Cancelar</button>
                         <button type="submit" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">Guardar</button>
                     </div>
                 </form>
@@ -268,16 +331,6 @@
                 sessionStorage.removeItem('scrollPosition');
             }
         });
-
-        function focusPrice(id) {
-            setTimeout(() => {
-                const input = document.getElementById('price-' + id);
-                if (input) {
-                    input.focus();
-                    input.select();
-                }
-            }, 150); // Aumentado a 150ms para dar tiempo a Flowbite a actualizar aria-hidden
-        }
 
         // Función para crear un snapshot de precios
         document.addEventListener('DOMContentLoaded', function() {

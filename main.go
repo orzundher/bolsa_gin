@@ -28,8 +28,9 @@ type Migration struct {
 // Ticker representa un símbolo bursátil con su precio actual.
 type Ticker struct {
 	gorm.Model
-	Name         string `gorm:"uniqueIndex"`
-	CurrentPrice float64
+	Name               string `gorm:"uniqueIndex"`
+	CurrentPrice       float64
+	YahooFinanceTicker string
 }
 
 // Investment representa una única compra de acciones en la BD.
@@ -68,12 +69,13 @@ type PriceHistory struct {
 
 // TickerView representa los datos de un ticker para mostrar en la UI.
 type TickerView struct {
-	ID                uint
-	Name              string
-	CurrentPrice      float64
-	UpdatedAt         string
-	SnapshotChange    float64 // Cambio porcentual entre los últimos 2 snapshots
-	HasSnapshotChange bool    // Indica si hay datos suficientes para mostrar el cambio
+	ID                 uint
+	Name               string
+	CurrentPrice       float64
+	UpdatedAt          string
+	SnapshotChange     float64 // Cambio porcentual entre los últimos 2 snapshots
+	HasSnapshotChange  bool    // Indica si hay datos suficientes para mostrar el cambio
+	YahooFinanceTicker string
 }
 
 // InvestmentView representa los datos de inversión que se mostrarán en la página.
@@ -298,12 +300,13 @@ func main() {
 			}
 
 			tickerViews = append(tickerViews, TickerView{
-				ID:                t.ID,
-				Name:              t.Name,
-				CurrentPrice:      t.CurrentPrice,
-				UpdatedAt:         t.UpdatedAt.Format("02 Jan 2006 15:04"),
-				SnapshotChange:    changeVal,
-				HasSnapshotChange: hasChange,
+				ID:                 t.ID,
+				Name:               t.Name,
+				CurrentPrice:       t.CurrentPrice,
+				UpdatedAt:          t.UpdatedAt.Format("02 Jan 2006 15:04"),
+				SnapshotChange:     changeVal,
+				HasSnapshotChange:  hasChange,
+				YahooFinanceTicker: t.YahooFinanceTicker,
 			})
 		}
 
@@ -339,6 +342,7 @@ func main() {
 	router.POST("/add-ticker", func(c *gin.Context) {
 		name := strings.ToUpper(c.PostForm("name"))
 		priceStr := strings.Replace(c.PostForm("current_price"), ",", ".", -1)
+		yahooTicker := c.PostForm("yahoo_finance_ticker")
 
 		if name == "" {
 			c.String(http.StatusBadRequest, "El nombre del ticker es obligatorio.")
@@ -357,7 +361,7 @@ func main() {
 			return
 		}
 
-		newTicker := Ticker{Name: name, CurrentPrice: price}
+		newTicker := Ticker{Name: name, CurrentPrice: price, YahooFinanceTicker: yahooTicker}
 		db.Create(&newTicker)
 
 		log.Printf("Nuevo ticker creado: %s", name)
@@ -381,6 +385,7 @@ func main() {
 
 		name := strings.ToUpper(c.PostForm("name"))
 		priceStr := strings.Replace(c.PostForm("current_price"), ",", ".", -1)
+		yahooTicker := c.PostForm("yahoo_finance_ticker")
 
 		if name == "" {
 			c.String(http.StatusBadRequest, "El nombre del ticker es obligatorio.")
@@ -392,9 +397,11 @@ func main() {
 			price = ticker.CurrentPrice
 		}
 
-		db.Model(&ticker).Updates(map[string]interface{}{
-			"name":          name,
-			"current_price": price,
+		// Actualizar campos usando Select para incluir campos vacíos
+		db.Model(&ticker).Select("Name", "CurrentPrice", "YahooFinanceTicker").Updates(Ticker{
+			Name:               name,
+			CurrentPrice:       price,
+			YahooFinanceTicker: yahooTicker,
 		})
 
 		log.Printf("Ticker %d actualizado: %s", id, name)
@@ -1558,9 +1565,10 @@ func runMigrations(database *gorm.DB) error {
 
 	// Definir todas las migraciones disponibles
 	migrations := map[string]func(*gorm.DB) error{
-		"001_create_initial_schema":       migration001CreateInitialSchema,
-		"002_migrate_to_ticker_id_schema": migration002MigrateToTickerIDSchema,
-		"003_create_price_history_table":  migration003CreatePriceHistoryTable,
+		"001_create_initial_schema":           migration001CreateInitialSchema,
+		"002_migrate_to_ticker_id_schema":     migration002MigrateToTickerIDSchema,
+		"003_create_price_history_table":      migration003CreatePriceHistoryTable,
+		"004_add_yahoo_finance_ticker_column": migration004AddYahooFinanceTickerColumn,
 	}
 
 	// Obtener migraciones ya aplicadas
@@ -1769,6 +1777,22 @@ func migration003CreatePriceHistoryTable(database *gorm.DB) error {
 		log.Println("  Índices creados en price_histories")
 	} else {
 		log.Println("  Tabla price_histories ya existe")
+	}
+
+	return nil
+}
+
+// migration004AddYahooFinanceTickerColumn agrega la columna yahoo_finance_ticker a la tabla tickers
+func migration004AddYahooFinanceTickerColumn(database *gorm.DB) error {
+	log.Println("Agregando columna yahoo_finance_ticker a tabla tickers...")
+
+	if !database.Migrator().HasColumn(&Ticker{}, "YahooFinanceTicker") {
+		if err := database.Migrator().AddColumn(&Ticker{}, "YahooFinanceTicker"); err != nil {
+			return fmt.Errorf("error al agregar columna yahoo_finance_ticker: %v", err)
+		}
+		log.Println("  Columna yahoo_finance_ticker agregada exitosamente")
+	} else {
+		log.Println("  Columna yahoo_finance_ticker ya existe")
 	}
 
 	return nil
