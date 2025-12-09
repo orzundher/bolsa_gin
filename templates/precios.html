@@ -10,6 +10,26 @@
     <!-- Flowbite CSS -->
     <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
     <link href="/static/css/common.css" rel="stylesheet">
+    <script>
+        // Funciones para el modal de agregar ticker (definidas antes del body)
+        function openAddTickerModal() {
+            const modal = document.getElementById('add-ticker-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            // Reset form
+            document.getElementById('add-name').value = '';
+            document.getElementById('add-price').value = '';
+            document.getElementById('add-yahoo').value = '';
+            // Focus en el primer campo
+            setTimeout(() => document.getElementById('add-name').focus(), 100);
+        }
+        
+        function closeAddTickerModal() {
+            const modal = document.getElementById('add-ticker-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    </script>
 </head>
 
 <body class="bg-gray-50 dark:bg-gray-900">
@@ -22,7 +42,7 @@
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Tickers Registrados</h2>
             <div class="flex gap-2">
-                <button type="button" data-modal-target="add-ticker-modal" data-modal-toggle="add-ticker-modal" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:ring-4 focus:outline-none focus:ring-green-300 dark:bg-green-500 dark:hover:bg-green-600 dark:focus:ring-green-800">
+                <button type="button" onclick="openAddTickerModal()" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:ring-4 focus:outline-none focus:ring-green-300 dark:bg-green-500 dark:hover:bg-green-600 dark:focus:ring-green-800">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                     </svg>
@@ -144,7 +164,7 @@
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
                         Agregar Nuevo Ticker
                     </h3>
-                    <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" data-modal-toggle="add-ticker-modal">
+                    <button type="button" onclick="closeAddTickerModal()" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white">
                         <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
                             <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
                         </svg>
@@ -168,7 +188,7 @@
                         </div>
                     </div>
                     <div class="flex justify-end gap-2">
-                        <button type="button" data-modal-toggle="add-ticker-modal" class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600">Cancelar</button>
+                        <button type="button" onclick="closeAddTickerModal()" class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600">Cancelar</button>
                         <button type="submit" class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">Agregar</button>
                     </div>
                 </form>
@@ -225,6 +245,14 @@
     <script src="/static/js/table-sort.js"></script>
     
     <script>
+        // Cerrar modal al hacer clic fuera
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('add-ticker-modal');
+            if (modal && event.target === modal) {
+                closeAddTickerModal();
+            }
+        });
+
         // Guardar posición del scroll antes de enviar formulario
         document.querySelectorAll('form[action^="/update-ticker"]').forEach(form => {
             form.addEventListener('submit', function() {
