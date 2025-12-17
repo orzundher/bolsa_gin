@@ -195,10 +195,16 @@ func main() {
 
 	// Ruta para mostrar la página de compras
 	router.GET("/compras", func(c *gin.Context) {
-		investments, _, _, _, _, _, _, _, _, _, err := getInvestmentData()
+		investments, summaries, _, _, _, _, _, _, _, _, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
+		}
+
+		// Crear mapa de acciones actuales por ticker
+		tickerShares := make(map[string]float64)
+		for _, s := range summaries {
+			tickerShares[s.Ticker] = s.TotalShares
 		}
 
 		// Obtener todos los tickers disponibles
@@ -210,18 +216,25 @@ func main() {
 		}
 
 		c.HTML(http.StatusOK, "compras.html", gin.H{
-			"Investments": investments,
-			"Tickers":     tickerViews,
-			"ActivePage":  "compras",
+			"Investments":  investments,
+			"Tickers":      tickerViews,
+			"TickerShares": tickerShares,
+			"ActivePage":   "compras",
 		})
 	})
 
 	// Ruta para mostrar la página de ventas
 	router.GET("/ventas", func(c *gin.Context) {
-		_, _, sales, _, _, _, _, _, _, _, err := getInvestmentData()
+		_, summaries, sales, _, _, _, _, _, _, _, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
+		}
+
+		// Crear mapa de acciones actuales por ticker
+		tickerShares := make(map[string]float64)
+		for _, s := range summaries {
+			tickerShares[s.Ticker] = s.TotalShares
 		}
 
 		// Obtener todos los tickers disponibles
@@ -233,9 +246,10 @@ func main() {
 		}
 
 		c.HTML(http.StatusOK, "ventas.html", gin.H{
-			"Sales":      sales,
-			"Tickers":    tickerViews,
-			"ActivePage": "ventas",
+			"Sales":        sales,
+			"Tickers":      tickerViews,
+			"TickerShares": tickerShares,
+			"ActivePage":   "ventas",
 		})
 	})
 
@@ -332,8 +346,72 @@ func main() {
 			Order("created_at DESC").
 			Scan(&snapshots)
 
+		// --- Calculation for Top Gainers/Losers ---
+		type TickerPerf struct {
+			Ticker     string
+			FirstDate  time.Time
+			LastDate   time.Time
+			FirstPrice float64
+			LastPrice  float64
+			AbsChange  float64
+			PctChange  float64
+		}
+
+		var allHistory []PriceHistory
+		db.Preload("Ticker").Order("created_at asc").Find(&allHistory)
+
+		perfMap := make(map[uint]*TickerPerf)
+
+		for _, h := range allHistory {
+			if _, exists := perfMap[h.TickerID]; !exists {
+				perfMap[h.TickerID] = &TickerPerf{
+					Ticker:     h.Ticker.Name,
+					FirstDate:  h.CreatedAt,
+					FirstPrice: h.Price,
+				}
+			}
+			// Update last entry (since we are iterating in ASC order)
+			perfMap[h.TickerID].LastDate = h.CreatedAt
+			perfMap[h.TickerID].LastPrice = h.Price
+		}
+
+		var perfs []*TickerPerf
+		for _, p := range perfMap {
+			p.AbsChange = p.LastPrice - p.FirstPrice
+			if p.FirstPrice != 0 {
+				p.PctChange = (p.AbsChange / p.FirstPrice) * 100
+			}
+			perfs = append(perfs, p)
+		}
+
+		// Sort for Gainers (Highest PctChange)
+		sort.Slice(perfs, func(i, j int) bool {
+			return perfs[i].PctChange > perfs[j].PctChange
+		})
+
+		var topGainers []*TickerPerf
+		for i := 0; i < len(perfs) && i < 10; i++ {
+			if perfs[i].PctChange > 0 {
+				topGainers = append(topGainers, perfs[i])
+			}
+		}
+
+		// Sort for Losers (Lowest PctChange - most negative)
+		sort.Slice(perfs, func(i, j int) bool {
+			return perfs[i].PctChange < perfs[j].PctChange
+		})
+
+		var topLosers []*TickerPerf
+		for i := 0; i < len(perfs) && i < 10; i++ {
+			if perfs[i].PctChange < 0 {
+				topLosers = append(topLosers, perfs[i])
+			}
+		}
+
 		c.HTML(http.StatusOK, "snapshots.html", gin.H{
 			"Snapshots":  snapshots,
+			"TopGainers": topGainers,
+			"TopLosers":  topLosers,
 			"ActivePage": "snapshots",
 		})
 	})

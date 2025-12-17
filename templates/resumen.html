@@ -21,9 +21,9 @@
         <!-- Toggle para mostrar/ocultar tickers con pocas acciones -->
         <div class="mb-4 flex items-center">
             <label class="inline-flex items-center cursor-pointer">
-                <input type="checkbox" id="showEmptyTickers" class="sr-only peer">
+                <input type="checkbox" id="showSignificantTickersOnly" class="sr-only peer">
                 <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Mostrar tickers con menos de 0.000001 acciones</span>
+                <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Mostrar solo tickers con más de 0.000001 acciones</span>
             </label>
         </div>
 
@@ -67,37 +67,51 @@
     <script src="/static/js/table-sort.js"></script>
     
     <script>
-        // Restaurar posición del scroll al cargar la página
+        // Restaurar posición del scroll al cargar la página y estado del filtro
         window.addEventListener('load', function() {
             const scrollPosition = sessionStorage.getItem('resumenScrollPosition');
             if (scrollPosition) {
                 window.scrollTo(0, parseInt(scrollPosition));
                 sessionStorage.removeItem('resumenScrollPosition');
             }
+
+            // Restaurar estado del filtro desde localStorage
+            const savedState = localStorage.getItem('showSignificantTickersOnly');
+            if (savedState === 'true') {
+                document.getElementById('showSignificantTickersOnly').checked = true;
+            } else {
+                document.getElementById('showSignificantTickersOnly').checked = false;
+            }
+            
+            // Aplicar filtro inicial
+            filterTickers();
         });
 
-        // Función para filtrar tickers con pocas acciones
-        function filterEmptyTickers() {
-            const showEmpty = document.getElementById('showEmptyTickers').checked;
+        // Función para filtrar tickers
+        function filterTickers() {
+            const checkbox = document.getElementById('showSignificantTickersOnly');
+            const filterActive = checkbox.checked;
+            
+            // Guardar estado en localStorage
+            localStorage.setItem('showSignificantTickersOnly', filterActive);
+
             const rows = document.querySelectorAll('#summaryTable tbody tr');
             
             rows.forEach(row => {
                 const shares = parseFloat(row.getAttribute('data-shares'));
-                if (shares < 0.000001 && !showEmpty) {
+                
+                // Si el filtro está activado (checked), ocultar los que tienen pocas acciones
+                if (filterActive && shares <= 0.000001) {
                     row.style.display = 'none';
                 } else {
+                    // Si no está activado, o si tiene suficientes acciones, mostrar
                     row.style.display = '';
                 }
             });
         }
 
-        // Aplicar filtro al cargar la página
-        window.addEventListener('load', function() {
-            filterEmptyTickers();
-        });
-
         // Aplicar filtro cuando cambie el toggle
-        document.getElementById('showEmptyTickers').addEventListener('change', filterEmptyTickers);
+        document.getElementById('showSignificantTickersOnly').addEventListener('change', filterTickers);
     </script>
 
 </body>
