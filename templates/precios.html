@@ -21,6 +21,7 @@
             document.getElementById('add-name').value = '';
             document.getElementById('add-price').value = '';
             document.getElementById('add-yahoo').value = '';
+            document.getElementById('add-usdeur').checked = false;
             // Focus en el primer campo
             setTimeout(() => document.getElementById('add-name').focus(), 100);
         }
@@ -124,6 +125,7 @@
                     <tr>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Símbolo</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Yahoo Ticker</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">USD/EUR</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Precio Actual</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Cambio Snapshots</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Última Actualización</th>
@@ -135,6 +137,19 @@
                     <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer" onclick="openEditModal({{.ID}})">
                         <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{{.Name}}</th>
                         <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{if .YahooFinanceTicker}}{{.YahooFinanceTicker}}{{else}}—{{end}}</td>
+                        <td class="px-6 py-4">
+                            {{if .UsdEur}}
+                            <span class="inline-flex items-center bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">
+                                <span class="w-2 h-2 me-1 bg-green-500 rounded-full"></span>
+                                Sí
+                            </span>
+                            {{else}}
+                            <span class="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-gray-700 dark:text-gray-300">
+                                <span class="w-2 h-2 me-1 bg-gray-500 rounded-full"></span>
+                                No
+                            </span>
+                            {{end}}
+                        </td>
                         <td class="px-6 py-4">{{printf "%.4f€" .CurrentPrice}}</td>
                         <td class="px-6 py-4">
                             {{if .HasSnapshotChange}}
@@ -249,6 +264,10 @@
                             <label for="add-yahoo" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Yahoo Finance Ticker</label>
                             <input type="text" name="yahoo_finance_ticker" id="add-yahoo" placeholder="Ej: AAPL" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
                         </div>
+                        <div class="flex items-center mb-4">
+                            <input id="add-usdeur" type="checkbox" name="usdeur" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                            <label for="add-usdeur" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">USD/EUR</label>
+                        </div>
                     </div>
                     <div class="flex justify-end gap-2">
                         <button type="button" onclick="closeAddTickerModal()" class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600">Cancelar</button>
@@ -291,6 +310,10 @@
                         <div>
                             <label for="yahoo-{{.ID}}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Yahoo Finance Ticker</label>
                             <input type="text" name="yahoo_finance_ticker" id="yahoo-{{.ID}}" value="{{.YahooFinanceTicker}}" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                        </div>
+                        <div class="flex items-center mb-4">
+                            <input id="usdeur-{{.ID}}" type="checkbox" name="usdeur" {{if .UsdEur}}checked{{end}} class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                            <label for="usdeur-{{.ID}}" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">USD/EUR</label>
                         </div>
                     </div>
                     <div class="flex justify-end gap-2">
