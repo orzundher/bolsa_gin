@@ -164,6 +164,10 @@ func main() {
 		// Calcular Valor de Salida: Utilidad Ventas + Utilidad Cartera - Costos de Operación - Número de Posiciones
 		exitValue := totalSaleUtility + portfolioUtility - totalOperationCost - float64(numPositions)
 
+		// Obtener notas
+		var notes []Note
+		db.Order("date desc").Find(&notes)
+
 		c.HTML(http.StatusOK, "index.html", gin.H{
 			"Investments":          investments,
 			"Summaries":            summaries,
@@ -175,8 +179,76 @@ func main() {
 			"PortfolioUtility":     portfolioUtility,
 			"NumPositions":         numPositions,
 			"ExitValue":            exitValue,
+			"Notes":                notes,
 			"ActivePage":           "home",
 		})
+	})
+
+	// Rutas para notas
+	router.POST("/api/notes", func(c *gin.Context) {
+		var input struct {
+			Date    string `json:"date"`
+			Content string `json:"content"`
+		}
+
+		if err := c.BindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		date, err := time.Parse("2006-01-02", input.Date)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Formato de fecha inválido"})
+			return
+		}
+
+		note := Note{Date: date, Content: input.Content}
+		if err := db.Create(&note).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al guardar la nota"})
+			return
+		}
+
+		c.JSON(http.StatusOK, note)
+	})
+
+	router.PUT("/api/notes/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		var input struct {
+			Date    string `json:"date"`
+			Content string `json:"content"`
+		}
+
+		if err := c.BindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var note Note
+		if err := db.First(&note, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Nota no encontrada"})
+			return
+		}
+
+		date, err := time.Parse("2006-01-02", input.Date)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Formato de fecha inválido"})
+			return
+		}
+
+		note.Date = date
+		note.Content = input.Content
+		db.Save(&note)
+
+		c.JSON(http.StatusOK, note)
+	})
+
+	router.DELETE("/api/notes/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		if err := db.Delete(&Note{}, id).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar la nota"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true})
 	})
 
 	// Ruta para mostrar la página de resumen
@@ -1647,6 +1719,7 @@ func runMigrations(database *gorm.DB) error {
 		"002_migrate_to_ticker_id_schema":     migration002MigrateToTickerIDSchema,
 		"003_create_price_history_table":      migration003CreatePriceHistoryTable,
 		"004_add_yahoo_finance_ticker_column": migration004AddYahooFinanceTickerColumn,
+		"005_create_notes_table":              migration005CreateNotesTable,
 	}
 
 	// Obtener migraciones ya aplicadas
