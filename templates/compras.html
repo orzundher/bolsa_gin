@@ -19,13 +19,20 @@
         <div class="p-4 mt-14">
 
         <!-- Botón para abrir modal de nueva compra -->
-        <div class="mb-8">
+        <div class="flex justify-between items-center mb-8">
             <button type="button" onclick="openAddInvestmentModal()" class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">
                 <svg class="w-5 h-5 me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                 </svg>
                 Registrar Nueva Compra
             </button>
+            
+            <!-- Toggle Filter -->
+            <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="showSignificantCompras" class="sr-only peer">
+                <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Mostrar solo con > 0.000001 acciones</span>
+            </label>
         </div>
 
         <!-- Table -->
@@ -49,7 +56,7 @@
                 </thead>
                 <tbody id="investmentsTableBody">
                     {{range .Investments}}
-                    <tr id="investment-row-{{.ID}}" class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                    <tr id="investment-row-{{.ID}}" class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600" data-current-shares="{{index $.TickerShares .Ticker}}">
                         <th scope="row" class="px-4 py-3 font-bold text-gray-900 dark:text-white whitespace-nowrap" data-field="ticker">{{.Ticker}}</th>
                         <td class="px-4 py-3" data-field="purchase_date">{{.PurchaseDate}}</td>
                         <td class="px-4 py-3" data-field="operation_cost">{{printf "%.3f€" .OperationCost}}</td>
@@ -240,6 +247,18 @@
         let editModal = null;
         
         document.addEventListener('DOMContentLoaded', function() {
+            // Restore filter state
+            const savedState = localStorage.getItem('showSignificantCompras');
+            if (savedState === 'true') {
+                document.getElementById('showSignificantCompras').checked = true;
+            } else {
+                document.getElementById('showSignificantCompras').checked = false;
+            }
+            filterInvestments();
+
+            // Filter event listener
+            document.getElementById('showSignificantCompras').addEventListener('change', filterInvestments);
+
             // Inicializar el modal
             const modalEl = document.getElementById('edit-investment-modal');
             editModal = new Modal(modalEl);
@@ -252,9 +271,9 @@
                 const data = {
                     ticker_id: parseInt(document.getElementById('edit-ticker-id').value),
                     purchase_date: document.getElementById('edit-purchase-date').value,
-                    shares: parseFloat(document.getElementById('edit-shares').value),
-                    purchase_price: parseFloat(document.getElementById('edit-purchase-price').value),
-                    operation_cost: parseFloat(document.getElementById('edit-operation-cost').value) || 0
+                    shares: parseFloat(document.getElementById('edit-shares').value.replace(',', '.')),
+                    purchase_price: parseFloat(document.getElementById('edit-purchase-price').value.replace(',', '.')),
+                    operation_cost: parseFloat(document.getElementById('edit-operation-cost').value.replace(',', '.')) || 0
                 };
                 
                 try {
@@ -364,6 +383,25 @@
             modal.classList.remove('flex');
         }
         
+        function filterInvestments() {
+            const checkbox = document.getElementById('showSignificantCompras');
+            const filterActive = checkbox.checked;
+            
+            localStorage.setItem('showSignificantCompras', filterActive);
+
+            const rows = document.querySelectorAll('#investmentsTableBody tr');
+            
+            rows.forEach(row => {
+                const currentShares = parseFloat(row.getAttribute('data-current-shares'));
+                
+                if (filterActive && (isNaN(currentShares) || currentShares <= 0.000001)) {
+                    row.style.display = 'none';
+                } else {
+                    row.style.display = '';
+                }
+            });
+        }
+
         // Close add modal when clicking outside of it
         document.addEventListener('click', function (event) {
             const addModal = document.getElementById('addInvestmentModal');

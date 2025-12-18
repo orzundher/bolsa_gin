@@ -18,13 +18,20 @@
         <div class="p-4 mt-14">
 
         <!-- Botón para abrir modal de nueva venta -->
-        <div class="mb-8">
+        <div class="flex justify-between items-center mb-8">
             <button type="button" onclick="openAddSaleModal()" class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">
                 <svg class="w-5 h-5 me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                 </svg>
                 Registrar Nueva Venta
             </button>
+
+            <!-- Toggle Filter -->
+            <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="showSignificantVentas" class="sr-only peer">
+                <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Mostrar solo con > 0.000001 acciones</span>
+            </label>
         </div>
 
         <!-- Table -->
@@ -51,7 +58,7 @@
                 </thead>
                 <tbody>
                     {{range .Sales}}
-                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600" data-id="{{.ID}}">
+                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600" data-id="{{.ID}}" data-current-shares="{{index $.TickerShares .Ticker}}">
                         <th scope="row" class="px-6 py-4 font-bold text-gray-900 dark:text-white whitespace-nowrap" data-field="ticker" data-ticker-id="{{.TickerID}}">{{.Ticker}}</th>
                         <td class="px-6 py-4 whitespace-nowrap" data-field="sale_date">{{.SaleDate}}</td>
                         <td class="px-6 py-4" data-field="operation_cost">{{printf "%.2f€" .OperationCost}}</td>
@@ -270,6 +277,40 @@
     <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
     <script src="/static/js/table-sort.js"></script>
     <script src="/static/js/ventas.js?v=3"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Restore filter state
+            const savedState = localStorage.getItem('showSignificantVentas');
+            if (savedState === 'true') {
+                document.getElementById('showSignificantVentas').checked = true;
+            } else {
+                document.getElementById('showSignificantVentas').checked = false;
+            }
+            filterSales();
+
+            // Filter event listener
+            document.getElementById('showSignificantVentas').addEventListener('change', filterSales);
+        });
+
+        function filterSales() {
+            const checkbox = document.getElementById('showSignificantVentas');
+            const filterActive = checkbox.checked;
+            
+            localStorage.setItem('showSignificantVentas', filterActive);
+
+            const rows = document.querySelectorAll('#salesTable tbody tr');
+            
+            rows.forEach(row => {
+                const currentShares = parseFloat(row.getAttribute('data-current-shares'));
+                
+                if (filterActive && (isNaN(currentShares) || currentShares <= 0.000001)) {
+                    row.style.display = 'none';
+                } else {
+                    row.style.display = '';
+                }
+            });
+        }
+    </script>
 
 </body>
 

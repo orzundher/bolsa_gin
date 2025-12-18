@@ -24,6 +24,75 @@
             <p class="text-gray-600 dark:text-gray-400">Historial de snapshots guardados de precios de tickers</p>
         </div>
 
+        <!-- Performance Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Top Gainers -->
+            <div class="relative overflow-x-auto shadow-md sm:rounded-lg">
+                <div class="p-4 bg-white dark:bg-gray-800 border-b dark:border-gray-700">
+                    <h3 class="text-lg font-semibold text-green-600 dark:text-green-400">🚀 Top 10 Subidas</h3>
+                </div>
+                <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                        <tr>
+                            <th scope="col" class="px-6 py-3">Ticker</th>
+                            <th scope="col" class="px-6 py-3 text-right">Inicio</th>
+                            <th scope="col" class="px-6 py-3 text-right">Fin</th>
+                            <th scope="col" class="px-6 py-3 text-right">Cambio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .TopGainers}}
+                        <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                            <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{{.Ticker}}</th>
+                            <td class="px-6 py-4 text-right">{{printf "%.2f" .FirstPrice}}</td>
+                            <td class="px-6 py-4 text-right">{{printf "%.2f" .LastPrice}}</td>
+                            <td class="px-6 py-4 text-right font-medium text-green-600 dark:text-green-400">
+                                {{printf "+%.2f" .AbsChange}} ({{printf "+%.2f" .PctChange}}%)
+                            </td>
+                        </tr>
+                        {{else}}
+                        <tr>
+                            <td colspan="4" class="px-6 py-4 text-center">No hay datos suficientes</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Top Losers -->
+            <div class="relative overflow-x-auto shadow-md sm:rounded-lg">
+                <div class="p-4 bg-white dark:bg-gray-800 border-b dark:border-gray-700">
+                    <h3 class="text-lg font-semibold text-red-600 dark:text-red-400">📉 Top 10 Bajadas</h3>
+                </div>
+                <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                        <tr>
+                            <th scope="col" class="px-6 py-3">Ticker</th>
+                            <th scope="col" class="px-6 py-3 text-right">Inicio</th>
+                            <th scope="col" class="px-6 py-3 text-right">Fin</th>
+                            <th scope="col" class="px-6 py-3 text-right">Cambio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .TopLosers}}
+                        <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                            <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{{.Ticker}}</th>
+                            <td class="px-6 py-4 text-right">{{printf "%.2f" .FirstPrice}}</td>
+                            <td class="px-6 py-4 text-right">{{printf "%.2f" .LastPrice}}</td>
+                            <td class="px-6 py-4 text-right font-medium text-red-600 dark:text-red-400">
+                                {{printf "%.2f" .AbsChange}} ({{printf "%.2f" .PctChange}}%)
+                            </td>
+                        </tr>
+                        {{else}}
+                         <tr>
+                            <td colspan="4" class="px-6 py-4 text-center">No hay datos suficientes</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Snapshots Table -->
         <div class="relative overflow-x-auto shadow-md sm:rounded-lg">
             <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400" id="snapshotsTable">
