@@ -14,6 +14,33 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    }
+});
+
+let fpAddSale = null;
+let fpEditSale = null;
+
+// Configuración de Flatpickr
+const flatpickrConfig = {
+    enableTime: true,
+    dateFormat: "Y-m-d\\TH:i",
+    altInput: true,
+    altFormat: "d.m.Y H:i",
+    time_24hr: true,
+    locale: "de"
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar Flatpickr si existen los elementos
+    const addInput = document.getElementById('add_sale_date');
+    if (addInput) {
+        fpAddSale = flatpickr(addInput, flatpickrConfig);
+    }
+    
+    const editInput = document.getElementById('edit_sale_date');
+    if (editInput) {
+        fpEditSale = flatpickr(editInput, flatpickrConfig);
+    }
 });
 
 /**
@@ -178,7 +205,12 @@ function openEditModal(id, ticker, tickerId, saleDate, shares, salePrice, operat
             };
             const month = monthMap[monthStr] || '01';
 
-            dateInput.value = `${year}-${month}-${day}T${hour}:${minute}`;
+            const isoDate = `${year}-${month}-${day}T${hour}:${minute}`;
+            if (fpEditSale) {
+                fpEditSale.setDate(isoDate);
+            } else {
+                dateInput.value = isoDate;
+            }
         }
     }
 
@@ -228,7 +260,15 @@ function openAddSaleModal() {
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
 
-    document.getElementById('add_sale_date').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+
+    const isoDate = `${year}-${month}-${day}T${hours}:${minutes}`;
+    
+    if (fpAddSale) {
+        fpAddSale.setDate(isoDate);
+    } else {
+        document.getElementById('add_sale_date').value = isoDate;
+    }
 
     // Show modal
     modal.classList.remove('hidden');

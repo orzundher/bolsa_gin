@@ -10,6 +10,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Flowbite CSS -->
     <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
+    <!-- Flatpickr CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link href="/static/css/common.css" rel="stylesheet">
 </head>
 
@@ -163,7 +165,7 @@
                             <!-- Fecha Venta -->
                             <div>
                                 <label for="edit_sale_date" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Fecha y Hora</label>
-                                <input type="datetime-local" name="sale_date" id="edit_sale_date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                                <input type="text" name="sale_date" id="edit_sale_date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                             </div>
                         </div>
                         
@@ -242,7 +244,7 @@
                             <!-- Fecha Venta -->
                             <div>
                                 <label for="add_sale_date" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Fecha y Hora</label>
-                                <input type="datetime-local" name="sale_date" id="add_sale_date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                                <input type="text" name="sale_date" id="add_sale_date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                             </div>
                         </div>
                         
@@ -288,6 +290,9 @@
 
     <!-- Flowbite JS -->
     <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+    <!-- Flatpickr JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/de.js"></script>
     <script src="/static/js/table-sort.js"></script>
     <script src="/static/js/ventas.js?v=3"></script>
     <script>

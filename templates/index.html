@@ -11,6 +11,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Flowbite CSS -->
     <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
+    <!-- Flatpickr CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link href="/static/css/common.css" rel="stylesheet">
 </head>
 
@@ -146,7 +148,7 @@
                         <div class="grid gap-4 mb-4 grid-cols-2">
                             <div class="col-span-2">
                                 <label for="noteDate" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Fecha</label>
-                                <input type="date" name="date" id="noteDate" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500" required="">
+                                <input type="text" name="date" id="noteDate" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500" required="">
                             </div>
                             <div class="col-span-2">
                                 <label for="noteContent" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Contenido</label>
@@ -167,32 +169,49 @@
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <!-- Flowbite JS -->
     <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+    <!-- Flatpickr JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/de.js"></script>
     <script src="/static/js/table-sort.js"></script>
     <script src="/static/js/home.js"></script>
 
     <script>
         // Funciones para gestión de notas
         let noteModal;
+        let fpNote = null;
         
         document.addEventListener('DOMContentLoaded', function() {
             const modalEl = document.getElementById('noteModal');
             if (modalEl) {
                 noteModal = new Modal(modalEl);
             }
+
+            // Inicializar Flatpickr para notas (solo fecha)
+            fpNote = flatpickr("#noteDate", {
+                enableTime: false,
+                dateFormat: "Y-m-d",
+                altInput: true,
+                altFormat: "d.m.Y",
+                locale: "de"
+            });
         });
 
         function openAddNoteModal() {
             document.getElementById('modalTitle').textContent = 'Nueva Nota';
             document.getElementById('noteForm').reset();
             document.getElementById('noteId').value = '';
-            document.getElementById('noteDate').valueAsDate = new Date();
+            if (fpNote) {
+                fpNote.setDate(new Date());
+            }
             noteModal.show();
         }
 
         function openEditNoteModal(id, date, content) {
             document.getElementById('modalTitle').textContent = 'Editar Nota';
             document.getElementById('noteId').value = id;
-            document.getElementById('noteDate').value = date;
+            if (fpNote) {
+                fpNote.setDate(date);
+            }
             document.getElementById('noteContent').value = content;
             noteModal.show();
         }

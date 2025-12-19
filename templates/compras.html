@@ -11,6 +11,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Flowbite CSS -->
     <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
+    <!-- Flatpickr CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link href="/static/css/common.css" rel="stylesheet">
 </head>
 
@@ -155,7 +157,8 @@
                         </div>
                         <div>
                             <label for="edit-purchase-date" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Fecha y Hora</label>
-                            <input type="datetime-local" name="purchase_date" id="edit-purchase-date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                            <label for="edit-purchase-date" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Fecha y Hora</label>
+                            <input type="text" name="purchase_date" id="edit-purchase-date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                         </div>
                         <div>
                             <label for="edit-shares" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Acciones</label>
@@ -216,7 +219,8 @@
                             <!-- Fecha Compra -->
                             <div>
                                 <label for="add_purchase_date" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Fecha y Hora</label>
-                                <input type="datetime-local" name="purchase_date" id="add_purchase_date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                                <label for="add_purchase_date" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Fecha y Hora</label>
+                                <input type="text" name="purchase_date" id="add_purchase_date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                             </div>
                         </div>
                         
@@ -254,12 +258,31 @@
 
     <!-- Flowbite JS -->
     <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+    <!-- Flatpickr JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/de.js"></script>
     <script src="/static/js/table-sort.js"></script>
     
     <script>
         let editModal = null;
+        let fpEdit = null;
+        let fpAdd = null;
+
+        // Configuración común para Flatpickr
+        const flatpickrConfig = {
+            enableTime: true,
+            dateFormat: "Y-m-d\\TH:i", // Formato para el servidor
+            altInput: true,
+            altFormat: "d.m.Y H:i",     // Formato visual (Alemán/24h)
+            time_24hr: true,
+            locale: "de"
+        };
         
         document.addEventListener('DOMContentLoaded', function() {
+            // Inicializar Flatpickr
+            fpAdd = flatpickr("#add_purchase_date", flatpickrConfig);
+            fpEdit = flatpickr("#edit-purchase-date", flatpickrConfig);
+
             // Restore filter states
             const savedState = localStorage.getItem('showSignificantCompras');
             if (savedState === 'true') {
@@ -328,7 +351,24 @@
                     
                     document.getElementById('edit-investment-id').value = data.id;
                     document.getElementById('edit-ticker-id').value = data.ticker_id;
-                    document.getElementById('edit-purchase-date').value = data.purchase_date;
+                    // Actualizar Flatpickr
+                    let dateVal = data.purchase_date;
+                    // Intentar parsear si viene en formato custom "02 Jan 2006 15:04"
+                    const dateMatch = dateVal.match(/^(\d{2}) (\w{3}) (\d{4}) (\d{2}):(\d{2})$/);
+                    if (dateMatch) {
+                         const months = {'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'};
+                         const day = dateMatch[1];
+                         const month = months[dateMatch[2]] || '01';
+                         const year = dateMatch[3];
+                         const time = `${dateMatch[4]}:${dateMatch[5]}`;
+                         dateVal = `${year}-${month}-${day}T${time}`;
+                    }
+                    
+                    if (fpEdit) {
+                        fpEdit.setDate(dateVal);
+                    } else {
+                         document.getElementById('edit-purchase-date').value = dateVal;
+                    }
                     document.getElementById('edit-shares').value = data.shares;
                     document.getElementById('edit-purchase-price').value = data.purchase_price;
                     document.getElementById('edit-operation-cost').value = data.operation_cost;
@@ -389,6 +429,10 @@
             const minutes = String(now.getMinutes()).padStart(2, '0');
             
             document.getElementById('add_purchase_date').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+            // Actualizar Flatpickr si existe
+            if (fpAdd) {
+                fpAdd.setDate(`${year}-${month}-${day}T${hours}:${minutes}`);
+            }
             
             // Show modal
             modal.classList.remove('hidden');
