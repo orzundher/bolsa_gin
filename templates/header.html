@@ -129,5 +129,18 @@ themeToggleBtn.addEventListener('click', function() {
         localStorage.setItem('darkMode', 'enabled');
     }
 });
+
+// Solución global para permitir el uso de la coma del numpad en inputs numéricos
+document.addEventListener('keydown', function(event) {
+    // Verificar si es un input de tipo number
+    if (event.target.tagName === 'INPUT' && (event.target.type === 'number' || event.target.inputMode === 'decimal')) {
+        // Detectar tecla coma (tanto del teclado principal como numpad)
+        if (event.key === ',' || event.code === 'NumpadComma') {
+            event.preventDefault();
+            // Insertar punto en la posición del cursor
+            document.execCommand('insertText', false, '.');
+        }
+    }
+});
 </script>
 {{end}}
