@@ -13,8 +13,6 @@ document.addEventListener('DOMContentLoaded', function () {
             saleDateHeader.click();
         }
     }
-
-    }
 });
 
 let fpAddSale = null;
@@ -41,6 +39,23 @@ document.addEventListener('DOMContentLoaded', function() {
     if (editInput) {
         fpEditSale = flatpickr(editInput, flatpickrConfig);
     }
+
+    // Event delegation for edit buttons
+    document.addEventListener('click', function(event) {
+        const editBtn = event.target.closest('.edit-sale-btn');
+        if (editBtn) {
+            const id = editBtn.dataset.saleId;
+            const ticker = editBtn.dataset.ticker;
+            const tickerId = editBtn.dataset.tickerId;
+            const saleDate = editBtn.dataset.saleDate;
+            const shares = editBtn.dataset.shares;
+            const salePrice = editBtn.dataset.salePrice;
+            const operationCost = editBtn.dataset.operationCost;
+            const withheldTax = editBtn.dataset.withheldTax;
+            
+            openEditModal(id, ticker, tickerId, saleDate, shares, salePrice, operationCost, withheldTax);
+        }
+    });
 });
 
 /**
@@ -168,10 +183,17 @@ function updateTableRow(data) {
             : 'text-red-600 dark:text-red-400');
     }
 
-    // Update the edit button onclick with new values
-    const editButton = row.querySelector('button[onclick^="openEditModal"]');
+    // Update the edit button data attributes with new values
+    const editButton = row.querySelector('.edit-sale-btn');
     if (editButton) {
-        editButton.setAttribute('onclick', `openEditModal(${data.id}, '${data.ticker}', ${data.ticker_id}, '${data.sale_date}', ${data.shares}, ${data.sale_price}, ${data.operation_cost}, ${data.withheld_tax})`);
+        editButton.dataset.saleId = data.id;
+        editButton.dataset.ticker = data.ticker;
+        editButton.dataset.tickerId = data.ticker_id;
+        editButton.dataset.saleDate = data.sale_date;
+        editButton.dataset.shares = data.shares;
+        editButton.dataset.salePrice = data.sale_price;
+        editButton.dataset.operationCost = data.operation_cost;
+        editButton.dataset.withheldTax = data.withheld_tax;
     }
 }
 
@@ -179,10 +201,6 @@ function updateTableRow(data) {
  * Opens the edit sale modal and populates it with the sale data
  */
 function openEditModal(id, ticker, tickerId, saleDate, shares, salePrice, operationCost, withheldTax) {
-    // Set form action
-    const form = document.getElementById('editSaleForm');
-    form.action = `/update-sale/${id}`;
-
     // Populate form fields
     document.getElementById('edit_sale_id').value = id;
     document.getElementById('edit_ticker_id').value = tickerId;
@@ -258,8 +276,6 @@ function openAddSaleModal() {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
     const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-
     const minutes = String(now.getMinutes()).padStart(2, '0');
 
     const isoDate = `${year}-${month}-${day}T${hours}:${minutes}`;

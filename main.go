@@ -106,6 +106,7 @@ type TickerSummaryView struct {
 	CurrentValue      float64
 	ProfitLoss        float64
 	Performance       float64
+	SalesProfit       float64
 }
 
 // SaleView representa los datos de venta que se mostrarán en la página.
@@ -151,7 +152,7 @@ func main() {
 
 	// Ruta principal para mostrar los datos
 	router.GET("/", func(c *gin.Context) {
-		investments, summaries, sales, totalCapital, netProfitLoss, totalOperationCost, _, portfolioPerformance, portfolioUtility, numPositions, err := getInvestmentData()
+		investments, summaries, sales, totalCapital, netProfitLoss, totalOperationCost, _, portfolioPerformance, portfolioUtility, numPositions, totalCurrentValue, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
@@ -179,6 +180,7 @@ func main() {
 			"TotalSaleUtility":     totalSaleUtility,
 			"PortfolioPerformance": portfolioPerformance,
 			"PortfolioUtility":     portfolioUtility,
+			"TotalCurrentValue":    totalCurrentValue,
 			"NumPositions":         numPositions,
 			"ExitValue":            exitValue,
 			"Notes":                notes,
@@ -255,7 +257,7 @@ func main() {
 
 	// Ruta para mostrar la página de resumen
 	router.GET("/resumen", func(c *gin.Context) {
-		_, summaries, _, _, _, _, _, _, _, _, err := getInvestmentData()
+		_, summaries, _, _, _, _, _, _, _, _, _, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
@@ -269,7 +271,7 @@ func main() {
 
 	// Ruta para mostrar la página de compras
 	router.GET("/compras", func(c *gin.Context) {
-		investments, summaries, _, _, _, _, _, _, _, _, err := getInvestmentData()
+		investments, summaries, _, _, _, _, _, _, _, _, _, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
@@ -299,7 +301,7 @@ func main() {
 
 	// Ruta para mostrar la página de ventas
 	router.GET("/ventas", func(c *gin.Context) {
-		_, summaries, sales, _, _, _, _, _, _, _, err := getInvestmentData()
+		_, summaries, sales, _, _, _, _, _, _, _, _, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
@@ -824,57 +826,6 @@ func main() {
 		db.Delete(&Sale{}, id)
 
 		log.Printf("Registro de venta con ID %d marcado como eliminado", id)
-		c.Redirect(http.StatusFound, redirectTo)
-	})
-
-	// Ruta para actualizar una venta
-	router.POST("/update-sale/:id", func(c *gin.Context) {
-		idStr := c.Param("id")
-		id, err := strconv.Atoi(idStr)
-		if err != nil {
-			c.String(http.StatusBadRequest, "ID inválido.")
-			return
-		}
-
-		var sale Sale
-		if err := db.First(&sale, id).Error; err != nil {
-			c.String(http.StatusNotFound, "Venta no encontrada.")
-			return
-		}
-
-		// Parsear y validar datos del formulario
-		tickerIDStr := c.PostForm("ticker_id")
-		saleDateStr := c.PostForm("sale_date")
-		sharesStr := strings.Replace(c.PostForm("shares"), ",", ".", -1)
-		salePriceStr := strings.Replace(c.PostForm("sale_price"), ",", ".", -1)
-		operationCostStr := strings.Replace(c.PostForm("operation_cost"), ",", ".", -1)
-		withheldTaxStr := strings.Replace(c.PostForm("withheld_tax"), ",", ".", -1)
-		redirectTo := c.PostForm("redirect_to")
-		if redirectTo == "" {
-			redirectTo = "/ventas"
-		}
-
-		tickerID, _ := strconv.Atoi(tickerIDStr)
-		shares, _ := strconv.ParseFloat(sharesStr, 64)
-		salePrice, _ := strconv.ParseFloat(salePriceStr, 64)
-		operationCost, _ := strconv.ParseFloat(operationCostStr, 64)
-		withheldTax, _ := strconv.ParseFloat(withheldTaxStr, 64)
-		saleDate, err := time.Parse("2006-01-02T15:04", saleDateStr)
-		if err != nil {
-			saleDate, _ = time.Parse("02/01/2006", saleDateStr)
-		}
-
-		// Actualizar el registro
-		db.Model(&sale).Updates(map[string]interface{}{
-			"ticker_id":      tickerID,
-			"sale_date":      saleDate,
-			"shares":         shares,
-			"sale_price":     salePrice,
-			"operation_cost": operationCost,
-			"withheld_tax":   withheldTax,
-		})
-
-		log.Printf("Registro de venta con ID %d actualizado", id)
 		c.Redirect(http.StatusFound, redirectTo)
 	})
 
@@ -1972,7 +1923,7 @@ func migration006AddUsdEurColumn(database *gorm.DB) error {
 	return nil
 }
 
-func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, float64, float64, float64, map[uint]float64, float64, float64, int, error) {
+func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, float64, float64, float64, map[uint]float64, float64, float64, int, float64, error) {
 	// 1. Obtener todos los tickers con sus precios
 	var tickers []Ticker
 	db.Find(&tickers)
@@ -2159,9 +2110,23 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 	}
 	portfolioUtility := totalPortfolioCurrentValue - totalPortfolioWACValue
 
-	// Actualizar summaries con el cálculo correcto basado en WAC
+	// Calcular utilidad de ventas por ticker
+	tickerSalesProfit := make(map[uint]float64)
+	for _, s := range sales {
+		wac := saleWACs[s.ID]
+		saleUtility := (s.SalePrice - wac) * s.Shares
+		tickerSalesProfit[s.TickerID] += saleUtility
+	}
+
+	// Actualizar summaries con el cálculo correcto basado en WAC y utilidad de ventas
 	for i := range summaryViews {
 		tickerID := summaryViews[i].TickerID
+
+		// Asignar utilidad de ventas si existe para este ticker
+		if profit, ok := tickerSalesProfit[tickerID]; ok {
+			summaryViews[i].SalesProfit = profit
+		}
+
 		if state, ok := tickerFinalState[tickerID]; ok && state.Shares > 0 {
 			currentPrice := tickerPrices[tickerID]
 			wac := 0.0
@@ -2177,7 +2142,7 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 				summaryViews[i].Performance = ((currentPrice - wac) / wac) * 100
 			}
 		} else {
-			// Si no hay acciones en cartera, poner todo en 0
+			// Si no hay acciones en cartera, poner todo en 0 excepto lo ya calculado
 			summaryViews[i].TotalShares = 0
 			summaryViews[i].CurrentValue = 0
 			summaryViews[i].ProfitLoss = 0
@@ -2240,5 +2205,5 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 		saleViews = append(saleViews, view)
 	}
 
-	return investmentViews, summaryViews, saleViews, totalCapital, netProfitLoss, totalOperationCost, tickerPrices, portfolioPerformance, portfolioUtility, numPositions, nil
+	return investmentViews, summaryViews, saleViews, totalCapital, netProfitLoss, totalOperationCost, tickerPrices, portfolioPerformance, portfolioUtility, numPositions, totalPortfolioCurrentValue, nil
 }
