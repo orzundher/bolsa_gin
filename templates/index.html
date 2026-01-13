@@ -81,6 +81,11 @@
             <div id="portfolioUtilityChart"></div>
         </div>
 
+        <!-- Distribución de la Cartera -->
+        <!-- Distribución de la Cartera -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8 p-6">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Distribución por Ticker</h2>
+            <div id="portfolioDistributionChart"></div>
         </div>
 
         <!-- Notes Section -->
@@ -136,8 +141,8 @@
                 {{end}}
             </div>
         </div>
-
     </div>
+</div>
     
     <!-- Note Modal -->
     <div id="noteModal" tabindex="-1" aria-hidden="true" class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full">
@@ -283,6 +288,24 @@
                 alert('Ocurrió un error al intentar eliminar la nota');
             }
         }
+
+        // Event Delegation para botones de notas
+        document.addEventListener('click', function(e) {
+            const editBtn = e.target.closest('.edit-note-btn');
+            const deleteBtn = e.target.closest('.delete-note-btn');
+
+            if (editBtn) {
+                const id = editBtn.dataset.noteId;
+                const date = editBtn.dataset.noteDate;
+                const content = editBtn.dataset.noteContent;
+                openEditNoteModal(id, date, content);
+            }
+
+            if (deleteBtn) {
+                const id = deleteBtn.dataset.noteId;
+                deleteNote(id);
+            }
+        });
 
         // Cargar datos del historial de utilidad de la cartera
         fetch('/api/portfolio-utility-history')
@@ -431,25 +454,95 @@
                 document.getElementById('portfolioUtilityChart').innerHTML = 
                     '<p class="text-center text-red-500 dark:text-red-400 py-8">Error al cargar los datos del gráfico</p>';
             });
-        // Event Delegation para botones de notas
-        document.addEventListener('click', function(e) {
-            const editBtn = e.target.closest('.edit-note-btn');
-            const deleteBtn = e.target.closest('.delete-note-btn');
 
-            if (editBtn) {
-                const id = editBtn.dataset.noteId;
-                const date = editBtn.dataset.noteDate;
-                const content = editBtn.dataset.noteContent;
-                openEditNoteModal(id, date, content);
-            }
+        /* Gráfico de Distribución de la Cartera */
+        (function() {
+            const distributionLabels = [];
+            const distributionSeries = [];
+            
+            {{range .Summaries}}
+            {{if gt .CurrentValue 0.0}}
+            distributionLabels.push('{{.Ticker}}');
+            distributionSeries.push({{.CurrentValue}});
+            {{end}}
+            {{end}}
 
-            if (deleteBtn) {
-                const id = deleteBtn.dataset.noteId;
-                deleteNote(id);
+            if (distributionSeries.length > 0) {
+                const distributionOptions = {
+                    series: distributionSeries,
+                    labels: distributionLabels,
+                    chart: {
+                        type: 'donut',
+                        height: 500,
+                    },
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            colors: '#9CA3AF'
+                        }
+                    },
+                    plotOptions: {
+                        pie: {
+                            donut: {
+                                size: '65%',
+                                labels: {
+                                    show: true,
+                                    name: {
+                                        show: true,
+                                        color: '#9CA3AF'
+                                    },
+                                    value: {
+                                        show: true,
+                                        color: '#fff',
+                                        formatter: function (val) {
+                                            return parseFloat(val).toFixed(2) + '€';
+                                        }
+                                    },
+                                    total: {
+                                        show: true,
+                                        label: 'Total',
+                                        color: '#9CA3AF',
+                                        formatter: function (w) {
+                                            const sum = w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+                                            return sum.toFixed(2) + '€';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function (val) {
+                                return val.toFixed(2) + '€';
+                            }
+                        }
+                    },
+                    theme: {
+                        mode: 'dark'
+                    },
+                    responsive: [{
+                        breakpoint: 480,
+                        options: {
+                            chart: {
+                                width: 300
+                            },
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }]
+                };
+
+                const distributionChart = new ApexCharts(document.querySelector("#portfolioDistributionChart"), distributionOptions);
+                distributionChart.render();
+            } else {
+                const el = document.getElementById('portfolioDistributionChart');
+                if (el) {
+                    el.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 py-8">No hay activos en cartera para mostrar la distribución</p>';
+                }
             }
-        });
+        })();
     </script>
-
 </body>
-
 </html>

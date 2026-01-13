@@ -107,6 +107,7 @@ type TickerSummaryView struct {
 	ProfitLoss        float64
 	Performance       float64
 	SalesProfit       float64
+	WeightPercentage  float64
 }
 
 // SaleView representa los datos de venta que se mostrarán en la página.
@@ -147,6 +148,7 @@ func main() {
 
 	// Configurar Gin
 	router := gin.Default()
+
 	router.LoadHTMLGlob("templates/*")
 	router.Static("/static", "./static")
 
@@ -2015,11 +2017,6 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 		summaryViews = append(summaryViews, *summary)
 	}
 
-	// Ordenar summaryViews por nombre del ticker
-	sort.Slice(summaryViews, func(i, j int) bool {
-		return summaryViews[i].Ticker < summaryViews[j].Ticker
-	})
-
 	// Calcular WAC (Weighted Average Cost) histórico para cada venta
 	type Event struct {
 		Date   time.Time
@@ -2148,6 +2145,13 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			summaryViews[i].ProfitLoss = 0
 			summaryViews[i].Performance = 0
 		}
+
+		// Calcular peso porcentual en la cartera
+		if totalPortfolioCurrentValue > 0 {
+			summaryViews[i].WeightPercentage = (summaryViews[i].CurrentValue / totalPortfolioCurrentValue) * 100
+		} else {
+			summaryViews[i].WeightPercentage = 0
+		}
 	}
 
 	// Contar número de posiciones (tickers con acciones > 0)
@@ -2157,6 +2161,11 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			numPositions++
 		}
 	}
+
+	// Ordenar summaryViews por peso porcentual (de mayor a menor)
+	sort.Slice(summaryViews, func(i, j int) bool {
+		return summaryViews[i].WeightPercentage > summaryViews[j].WeightPercentage
+	})
 
 	var saleViews []SaleView
 	for _, s := range sales {
