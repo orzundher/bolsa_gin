@@ -78,6 +78,7 @@ type TickerView struct {
 	HasSnapshotChange  bool    // Indica si hay datos suficientes para mostrar el cambio
 	YahooFinanceTicker string
 	UsdEur             bool
+	HasShares          bool
 }
 
 // InvestmentView representa los datos de inversión que se mostrarán en la página.
@@ -257,6 +258,74 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"success": true})
 	})
 
+	// Rutas para notas de tickers
+	router.POST("/api/ticker-notes", func(c *gin.Context) {
+		var input struct {
+			TickerID uint   `json:"ticker_id"`
+			Date     string `json:"date"`
+			Content  string `json:"content"`
+		}
+
+		if err := c.BindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		date, err := time.Parse("2006-01-02", input.Date)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Formato de fecha inválido"})
+			return
+		}
+
+		note := TickerNote{TickerID: input.TickerID, Date: date, Content: input.Content}
+		if err := db.Create(&note).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al guardar la nota del ticker"})
+			return
+		}
+
+		c.JSON(http.StatusOK, note)
+	})
+
+	router.PUT("/api/ticker-notes/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		var input struct {
+			Date    string `json:"date"`
+			Content string `json:"content"`
+		}
+
+		if err := c.BindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var note TickerNote
+		if err := db.First(&note, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Nota del ticker no encontrada"})
+			return
+		}
+
+		date, err := time.Parse("2006-01-02", input.Date)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Formato de fecha inválido"})
+			return
+		}
+
+		note.Date = date
+		note.Content = input.Content
+		db.Save(&note)
+
+		c.JSON(http.StatusOK, note)
+	})
+
+	router.DELETE("/api/ticker-notes/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		if err := db.Delete(&TickerNote{}, id).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar la nota del ticker"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true})
+	})
+
 	// Ruta para mostrar la página de resumen
 	router.GET("/resumen", func(c *gin.Context) {
 		_, summaries, _, _, _, _, _, _, _, _, _, err := getInvestmentData()
@@ -382,6 +451,13 @@ func main() {
 			}
 		}
 
+		// Obtener datos de inversión para saber si tenemos acciones
+		_, summaries, _, _, _, _, _, _, _, _, _, _ := getInvestmentData()
+		sharesMap := make(map[uint]float64)
+		for _, s := range summaries {
+			sharesMap[s.TickerID] = s.TotalShares
+		}
+
 		var tickerViews []TickerView
 		for _, t := range tickers {
 			changePtr := snapshotChanges[t.ID]
@@ -400,6 +476,7 @@ func main() {
 				HasSnapshotChange:  hasChange,
 				YahooFinanceTicker: t.YahooFinanceTicker,
 				UsdEur:             t.UsdEur,
+				HasShares:          sharesMap[t.ID] > 0.000001, // Pequeño margen para errores de punto flotante
 			})
 		}
 
@@ -1472,6 +1549,10 @@ func main() {
 			saleChartPrices = append(saleChartPrices, s.SalePrice)
 		}
 
+		// Obtener notas del ticker
+		var tickerNotes []TickerNote
+		db.Where("ticker_id = ?", tickerID).Order("date desc").Find(&tickerNotes)
+
 		c.HTML(http.StatusOK, "ticker_detail.html", gin.H{
 			"Ticker":              ticker,
 			"Investments":         investmentViews,
@@ -1492,6 +1573,7 @@ func main() {
 			"PurchaseChartPrices": purchaseChartPrices,
 			"SaleChartDates":      saleChartDates,
 			"SaleChartPrices":     saleChartPrices,
+			"Notes":               tickerNotes,
 			"ActivePage":          "resumen",
 		})
 	})
@@ -1680,6 +1762,7 @@ func runMigrations(database *gorm.DB) error {
 		"004_add_yahoo_finance_ticker_column": migration004AddYahooFinanceTickerColumn,
 		"005_create_notes_table":              migration005CreateNotesTable,
 		"006_add_usdeur_column":               migration006AddUsdEurColumn,
+		"007_create_ticker_notes_table":       migration007CreateTickerNotesTable,
 	}
 
 	// Obtener migraciones ya aplicadas
