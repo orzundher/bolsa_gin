@@ -81,6 +81,12 @@
             <div id="portfolioUtilityChart"></div>
         </div>
 
+        <!-- Gráfico de Evolución de Utilidad de Ventas -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8 p-6">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Evolución de Utilidad de Ventas (Realizada)</h2>
+            <div id="salesUtilityChart"></div>
+        </div>
+
         <!-- Distribución de la Cartera -->
         <!-- Distribución de la Cartera -->
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8 p-6">
@@ -450,8 +456,136 @@
                 chart.render();
             })
             .catch(error => {
-                console.error('Error cargando datos del gráfico:', error);
+                console.error('Error cargando datos del gráfico de utilidad de cartera:', error);
                 document.getElementById('portfolioUtilityChart').innerHTML = 
+                    '<p class="text-center text-red-500 dark:text-red-400 py-8">Error al cargar los datos del gráfico</p>';
+            });
+
+        // Cargar datos del historial de utilidad de ventas
+        fetch('/api/sales-utility-history')
+            .then(response => response.json())
+            .then(data => {
+                if (data.dates.length === 0) {
+                    document.getElementById('salesUtilityChart').innerHTML = 
+                        '<p class="text-center text-gray-500 dark:text-gray-400 py-8">No hay datos de ventas para mostrar el gráfico</p>';
+                    return;
+                }
+
+                // Función reutilizable para convertir fecha "DD Mon YYYY HH:MM" a timestamp
+                function parseDate(dateStr) {
+                    try {
+                        const months = {
+                            'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+                            'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+                        };
+                        const parts = dateStr.split(' ');
+                        const day = parseInt(parts[0]);
+                        const month = months[parts[1]];
+                        const year = parseInt(parts[2]);
+                        const time = parts[3] ? parts[3].split(':') : ['0', '0'];
+                        const hour = parseInt(time[0]);
+                        const minute = parseInt(time[1]);
+                        return new Date(year, month, day, hour, minute).getTime();
+                    } catch (error) {
+                        return null;
+                    }
+                }
+
+                const chartData = data.dates.map((date, index) => ({
+                    x: parseDate(date),
+                    y: data.utilities[index]
+                })).filter(point => point.x !== null && !isNaN(point.y));
+
+                const options = {
+                    series: [{
+                        name: 'Utilidad de Ventas',
+                        data: chartData
+                    }],
+                    chart: {
+                        type: 'area',
+                        height: 350,
+                        toolbar: {
+                            show: true
+                        },
+                        zoom: {
+                            enabled: true
+                        }
+                    },
+                    dataLabels: {
+                        enabled: false
+                    },
+                    stroke: {
+                        curve: 'stepline',
+                        width: 3
+                    },
+                    fill: {
+                        type: 'gradient',
+                        gradient: {
+                            shadeIntensity: 1,
+                            opacityFrom: 0.7,
+                            opacityTo: 0.9,
+                            stops: [0, 90, 100]
+                        }
+                    },
+                    colors: ['#3B82F6'], // Azul
+                    markers: {
+                        size: 5,
+                        strokeWidth: 0,
+                        hover: {
+                            size: 7
+                        }
+                    },
+                    xaxis: {
+                        type: 'datetime',
+                        labels: {
+                            datetimeUTC: false,
+                            format: 'dd MMM yyyy',
+                            style: {
+                                colors: '#9CA3AF'
+                            }
+                        }
+                    },
+                    yaxis: {
+                        labels: {
+                            formatter: function(value) {
+                                return value.toFixed(2) + '€';
+                            },
+                            style: {
+                                colors: '#9CA3AF'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        theme: 'dark',
+                        x: {
+                            format: 'dd MMM yyyy HH:mm'
+                        },
+                        y: {
+                            formatter: function(value) {
+                                const sign = value >= 0 ? '+' : '';
+                                return sign + value.toFixed(2) + '€';
+                            }
+                        }
+                    },
+                    legend: {
+                        show: true,
+                        position: 'top',
+                        horizontalAlign: 'center',
+                        labels: {
+                            colors: '#9CA3AF'
+                        }
+                    },
+                    grid: {
+                        borderColor: '#374151'
+                    }
+                };
+
+                const chart = new ApexCharts(document.querySelector("#salesUtilityChart"), options);
+                chart.render();
+            })
+            .catch(error => {
+                console.error('Error cargando datos del gráfico de utilidad de ventas:', error);
+                document.getElementById('salesUtilityChart').innerHTML = 
                     '<p class="text-center text-red-500 dark:text-red-400 py-8">Error al cargar los datos del gráfico</p>';
             });
 

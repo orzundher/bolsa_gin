@@ -326,6 +326,122 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"success": true})
 	})
 
+	// API: Obtener historial de utilidad de ventas por snapshot
+	router.GET("/api/sales-utility-history", func(c *gin.Context) {
+		// Obtener todos los snapshots ordenados por fecha
+		type SnapshotInfo struct {
+			SnapshotID string
+			CreatedAt  time.Time
+		}
+		var snapshots []SnapshotInfo
+		db.Model(&PriceHistory{}).
+			Select("DISTINCT snapshot_id, MIN(created_at) as created_at").
+			Group("snapshot_id").
+			Order("created_at ASC").
+			Scan(&snapshots)
+
+		if len(snapshots) == 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"dates":     []string{},
+				"utilities": []float64{},
+			})
+			return
+		}
+
+		// Obtener todas las inversiones y ventas
+		var allInvestments []Investment
+		db.Order("purchase_date asc").Find(&allInvestments)
+
+		var allSales []Sale
+		db.Order("sale_date asc").Find(&allSales)
+
+		// Para cada snapshot, calcular la utilidad de ventas acumulada hasta ese momento
+		var dates []string
+		var utilities []float64
+
+		for _, snapshot := range snapshots {
+			// Filtrar inversiones y ventas hasta la fecha del snapshot
+			type Event struct {
+				Date   time.Time
+				Type   string
+				Shares float64
+				Price  float64
+				SaleID uint
+			}
+
+			tickerEvents := make(map[uint][]Event)
+
+			// Agregar compras hasta la fecha del snapshot
+			for _, inv := range allInvestments {
+				if inv.PurchaseDate.Before(snapshot.CreatedAt) || inv.PurchaseDate.Equal(snapshot.CreatedAt) {
+					tickerEvents[inv.TickerID] = append(tickerEvents[inv.TickerID], Event{
+						Date:   inv.PurchaseDate,
+						Type:   "buy",
+						Shares: inv.Shares,
+						Price:  inv.PurchasePrice,
+					})
+				}
+			}
+
+			// Agregar ventas hasta la fecha del snapshot
+			for _, sale := range allSales {
+				if sale.SaleDate.Before(snapshot.CreatedAt) || sale.SaleDate.Equal(snapshot.CreatedAt) {
+					tickerEvents[sale.TickerID] = append(tickerEvents[sale.TickerID], Event{
+						Date:   sale.SaleDate,
+						Type:   "sell",
+						Shares: sale.Shares,
+						Price:  sale.SalePrice,
+						SaleID: sale.ID,
+					})
+				}
+			}
+
+			// Calcular la utilidad de ventas total hasta este snapshot
+			totalSalesUtility := 0.0
+
+			for _, events := range tickerEvents {
+				// Ordenar eventos por fecha
+				sort.Slice(events, func(i, j int) bool {
+					if events[i].Date.Equal(events[j].Date) {
+						return events[i].Type == "buy"
+					}
+					return events[i].Date.Before(events[j].Date)
+				})
+
+				currentShares := 0.0
+				currentCapital := 0.0
+
+				for _, e := range events {
+					if e.Type == "buy" {
+						currentShares += e.Shares
+						currentCapital += e.Shares * e.Price
+					} else if e.Type == "sell" {
+						wac := 0.0
+						if currentShares > 0 {
+							wac = currentCapital / currentShares
+						}
+
+						// Calcular utilidad de esta venta
+						saleUtility := (e.Price - wac) * e.Shares
+						totalSalesUtility += saleUtility
+
+						// Actualizar posición
+						currentCapital -= e.Shares * wac
+						currentShares -= e.Shares
+					}
+				}
+			}
+
+			dates = append(dates, snapshot.CreatedAt.Format("02 Jan 2006 15:04"))
+			utilities = append(utilities, totalSalesUtility)
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"dates":     dates,
+			"utilities": utilities,
+		})
+	})
+
 	// Ruta para mostrar la página de resumen
 	router.GET("/resumen", func(c *gin.Context) {
 		_, summaries, _, _, _, _, _, _, _, _, _, err := getInvestmentData()
