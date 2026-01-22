@@ -54,7 +54,6 @@ type Sale struct {
 	Shares        float64
 	SalePrice     float64
 	OperationCost float64
-	WithheldTax   float64
 }
 
 // PriceHistory representa un snapshot histórico de precio de un ticker.
@@ -120,7 +119,6 @@ type SaleView struct {
 	Shares          float64
 	SalePrice       float64
 	OperationCost   float64
-	WithheldTax     float64
 	TotalSaleValue  float64
 	CurrentPrice    float64
 	CurrentValue    float64
@@ -932,7 +930,6 @@ func main() {
 		sharesStr := strings.Replace(c.PostForm("shares"), ",", ".", -1)
 		salePriceStr := strings.Replace(c.PostForm("sale_price"), ",", ".", -1)
 		operationCostStr := strings.Replace(c.PostForm("operation_cost"), ",", ".", -1)
-		withheldTaxStr := strings.Replace(c.PostForm("withheld_tax"), ",", ".", -1)
 		redirectTo := c.PostForm("redirect_to")
 		if redirectTo == "" {
 			redirectTo = "/"
@@ -967,11 +964,6 @@ func main() {
 			operationCost = 0 // Default to 0 if empty or invalid
 		}
 
-		withheldTax, err := strconv.ParseFloat(withheldTaxStr, 64)
-		if err != nil {
-			withheldTax = 0 // Default to 0 if empty or invalid
-		}
-
 		saleDate, err := time.Parse("2006-01-02T15:04", saleDateStr)
 		if err != nil {
 			// Intentar formato DD/MM/YYYY para compatibilidad
@@ -996,7 +988,6 @@ func main() {
 			Shares:        shares,
 			SalePrice:     salePrice,
 			OperationCost: operationCost,
-			WithheldTax:   withheldTax,
 		}
 		db.Create(&newSale)
 
@@ -1321,7 +1312,6 @@ func main() {
 			Shares        float64 `json:"shares"`
 			SalePrice     float64 `json:"sale_price"`
 			OperationCost float64 `json:"operation_cost"`
-			WithheldTax   float64 `json:"withheld_tax"`
 		}
 
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -1341,7 +1331,6 @@ func main() {
 			"shares":         input.Shares,
 			"sale_price":     input.SalePrice,
 			"operation_cost": input.OperationCost,
-			"withheld_tax":   input.WithheldTax,
 		})
 
 		// Obtener el ticker actualizado
@@ -1417,7 +1406,6 @@ func main() {
 			"shares":           input.Shares,
 			"sale_price":       input.SalePrice,
 			"operation_cost":   input.OperationCost,
-			"withheld_tax":     input.WithheldTax,
 			"total_sale_value": totalSaleValue,
 			"performance":      performance,
 			"profit":           profit,
@@ -1447,7 +1435,6 @@ func main() {
 			"shares":         sale.Shares,
 			"sale_price":     sale.SalePrice,
 			"operation_cost": sale.OperationCost,
-			"withheld_tax":   sale.WithheldTax,
 		})
 	})
 
@@ -1616,7 +1603,6 @@ func main() {
 				Shares:          s.Shares,
 				SalePrice:       s.SalePrice,
 				OperationCost:   s.OperationCost,
-				WithheldTax:     s.WithheldTax,
 				TotalSaleValue:  totalSaleValue,
 				WACAtSale:       wacAtSale,
 				SalePerformance: salePerformance,
@@ -1636,6 +1622,12 @@ func main() {
 
 		// Utilidad: diferencia entre valor actual y valor ponderado del portafolio
 		utilidad := (ticker.CurrentPrice * currentShares) - (portfolioWAC * currentShares)
+
+		// Calcular distancia al WAC (cuánto falta para llegar al precio ponderado)
+		distanceToWAC := 0.0
+		if ticker.CurrentPrice > 0 && portfolioWAC > 0 {
+			distanceToWAC = ((portfolioWAC - ticker.CurrentPrice) / ticker.CurrentPrice) * 100
+		}
 
 		// Obtener historial de precios del ticker
 		var priceHistories []PriceHistory
@@ -1679,9 +1671,12 @@ func main() {
 			"TotalCostSell":       totalCostSell,
 			"TotalCosts":          totalCostBuy + totalCostSell,
 			"SharesInPortfolio":   currentShares,
+			"CurrentValue":        ticker.CurrentPrice * currentShares,
 			"PortfolioWAC":        portfolioWAC,
+			"PortfolioWACValue":   currentCapital,
 			"WACPerformance":      wacPerformance,
 			"Utilidad":            utilidad,
+			"DistanceToWAC":       distanceToWAC,
 			"TotalSaleUtility":    totalSaleUtility,
 			"PriceChartDates":     priceChartDates,
 			"PriceChartValues":    priceChartValues,
@@ -1879,6 +1874,7 @@ func runMigrations(database *gorm.DB) error {
 		"005_create_notes_table":              migration005CreateNotesTable,
 		"006_add_usdeur_column":               migration006AddUsdEurColumn,
 		"007_create_ticker_notes_table":       migration007CreateTickerNotesTable,
+		"008_drop_tax_column":                 migration008DropTaxColumn,
 	}
 
 	// Obtener migraciones ya aplicadas
@@ -2119,6 +2115,23 @@ func migration006AddUsdEurColumn(database *gorm.DB) error {
 		log.Println("  Columna usdeur agregada exitosamente")
 	} else {
 		log.Println("  Columna usdeur ya existe")
+	}
+
+	return nil
+}
+
+// migration008DropTaxColumn elimina la columna withheld_tax de la tabla sales
+func migration008DropTaxColumn(database *gorm.DB) error {
+	log.Println("Eliminando columna withheld_tax de tabla sales...")
+
+	// Verificar si la columna existe en la tabla sales
+	if database.Migrator().HasColumn("sales", "withheld_tax") {
+		if err := database.Migrator().DropColumn("sales", "withheld_tax"); err != nil {
+			return fmt.Errorf("error al eliminar columna withheld_tax: %v", err)
+		}
+		log.Println("  Columna withheld_tax eliminada exitosamente")
+	} else {
+		log.Println("  Columna withheld_tax no existe")
 	}
 
 	return nil
@@ -2399,7 +2412,6 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			Shares:          s.Shares,
 			SalePrice:       s.SalePrice,
 			OperationCost:   s.OperationCost,
-			WithheldTax:     s.WithheldTax,
 			TotalSaleValue:  totalSaleValue,
 			CurrentPrice:    currentPrice,
 			CurrentValue:    currentValue,

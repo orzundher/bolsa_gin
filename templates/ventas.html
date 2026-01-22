@@ -58,7 +58,6 @@
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Ticker</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Fecha</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Costo</th>
-                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Retención</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Acciones</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Precio Venta</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Monto Venta</th>
@@ -77,7 +76,6 @@
                         <th scope="row" class="px-6 py-4 font-bold text-gray-900 dark:text-white whitespace-nowrap" data-field="ticker" data-ticker-id="{{.TickerID}}">{{.Ticker}}</th>
                         <td class="px-6 py-4 whitespace-nowrap" data-field="sale_date">{{.SaleDate}}</td>
                         <td class="px-6 py-4" data-field="operation_cost">{{printf "%.2f€" .OperationCost}}</td>
-                        <td class="px-6 py-4" data-field="withheld_tax">{{printf "%.2f€" .WithheldTax}}</td>
                         <td class="px-6 py-4" data-field="shares">{{printf "%.6f" .Shares}}</td>
                         <td class="px-6 py-4" data-field="sale_price">{{printf "%.4f€" .SalePrice}}</td>
                         <td class="px-6 py-4" data-field="total_sale_value">{{printf "%.2f€" .TotalSaleValue}}</td>
@@ -104,8 +102,7 @@
                                             data-sale-date="{{.SaleDate}}"
                                             data-shares="{{.Shares}}"
                                             data-sale-price="{{.SalePrice}}"
-                                            data-operation-cost="{{.OperationCost}}"
-                                            data-withheld-tax="{{.WithheldTax}}">
+                                            data-operation-cost="{{.OperationCost}}">
                                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/>
                                             </svg>
@@ -199,11 +196,6 @@
                                 <input type="number" step="any" name="operation_cost" id="edit_operation_cost" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
                             </div>
                             
-                            <!-- Impuesto Retenido -->
-                            <div>
-                                <label for="edit_withheld_tax" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Impuesto Retenido</label>
-                                <input type="number" step="any" name="withheld_tax" id="edit_withheld_tax" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
-                            </div>
                         </div>
                     </div>
                     <!-- Modal footer -->
@@ -278,11 +270,6 @@
                                 <input type="number" step="any" name="operation_cost" id="add_operation_cost" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
                             </div>
                             
-                            <!-- Impuesto Retenido -->
-                            <div>
-                                <label for="add_withheld_tax" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Impuesto Retenido</label>
-                                <input type="number" step="any" name="withheld_tax" id="add_withheld_tax" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
-                            </div>
                         </div>
                     </div>
                     <!-- Modal footer -->

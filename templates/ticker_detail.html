@@ -39,6 +39,18 @@
                     <h3 class="text-xl font-bold text-blue-600 dark:text-blue-400">{{printf "%.4f€" .Ticker.CurrentPrice}}</h3>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Costo Ponderado</h4>
+                    <h3 class="text-xl font-bold text-purple-600 dark:text-purple-400">{{printf "%.4f€" .PortfolioWAC}}</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Distancia a Ponderado</h4>
+                    <h3 class="text-xl font-bold {{if le .DistanceToWAC 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">{{if ge .DistanceToWAC 0.0}}+{{end}}{{printf "%.2f" .DistanceToWAC}}%</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Rendimiento</h4>
+                    <h3 class="text-xl font-bold {{if ge .WACPerformance 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">{{if ge .WACPerformance 0.0}}+{{end}}{{printf "%.2f" .WACPerformance}}%</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
                     <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Total Comprado</h4>
                     <h3 class="text-xl font-bold text-gray-900 dark:text-white">{{printf "%.3f€" .TotalInvested}}</h3>
                 </div>
@@ -51,16 +63,16 @@
                     <h3 class="text-xl font-bold text-red-600 dark:text-red-400">{{printf "%.3f€" .TotalCosts}}</h3>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">En Cartera</h4>
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Acciones en Cartera</h4>
                     <h3 class="text-xl font-bold text-blue-600 dark:text-blue-400">{{printf "%.6f" .SharesInPortfolio}}</h3>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Costo Ponderado</h4>
-                    <h3 class="text-xl font-bold text-purple-600 dark:text-purple-400">{{printf "%.4f€" .PortfolioWAC}}</h3>
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Valor Actual</h4>
+                    <h3 class="text-xl font-bold text-blue-600 dark:text-blue-400">{{printf "%.2f€" .CurrentValue}}</h3>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Rendimiento</h4>
-                    <h3 class="text-xl font-bold {{if ge .WACPerformance 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">{{if ge .WACPerformance 0.0}}+{{end}}{{printf "%.2f" .WACPerformance}}%</h3>
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Valor Compra Pond.</h4>
+                    <h3 class="text-xl font-bold text-purple-600 dark:text-purple-400">{{printf "%.2f€" .PortfolioWACValue}}</h3>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
                     <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Utilidad Posible</h4>
@@ -140,7 +152,6 @@
                                 <th scope="col" class="px-4 py-3">Acciones</th>
                                 <th scope="col" class="px-4 py-3">Precio Venta</th>
                                 <th scope="col" class="px-4 py-3">Costo Op.</th>
-                                <th scope="col" class="px-4 py-3">Impuesto Retenido</th>
                                 <th scope="col" class="px-4 py-3">Total Venta</th>
                                 <th scope="col" class="px-4 py-3">Rendimiento</th>
                                 <th scope="col" class="px-4 py-3">Utilidad</th>
@@ -153,7 +164,6 @@
                                 <td class="px-4 py-3">{{printf "%.6f" .Shares}}</td>
                                 <td class="px-4 py-3">{{printf "%.4f€" .SalePrice}}</td>
                                 <td class="px-4 py-3">{{printf "%.3f€" .OperationCost}}</td>
-                                <td class="px-4 py-3">{{printf "%.3f€" .WithheldTax}}</td>
                                 <td class="px-4 py-3 font-semibold">{{printf "%.3f€" .TotalSaleValue}}</td>
                                 <td class="px-4 py-3 {{if ge .SalePerformance 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}} font-semibold">
                                     {{if ge .SalePerformance 0.0}}+{{end}}{{printf "%.2f%%" .SalePerformance}}
