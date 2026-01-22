@@ -2211,16 +2211,13 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 	var sales []Sale
 	db.Preload("Ticker").Order("sale_date desc").Find(&sales)
 
-	// Calcular el monto total de ventas por ticker
+	// Calcular el monto total de ventas por ticker y agregar costos de operación de ventas
 	tickerSalesAmount := make(map[uint]float64)
 	for _, s := range sales {
 		tickerSalesAmount[s.TickerID] += s.Shares * s.SalePrice
-	}
-
-	// Restar el monto de ventas de CurrentInvestment
-	for tickerID, salesAmount := range tickerSalesAmount {
-		if summary, ok := summaries[tickerID]; ok {
-			summary.CurrentInvestment -= salesAmount
+		totalOperationCost += s.OperationCost
+		if summary, ok := summaries[s.TickerID]; ok {
+			summary.TotalCost += s.OperationCost
 		}
 	}
 
@@ -2344,6 +2341,7 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			}
 			// Utilidad = (Precio Actual * Acciones) - (WAC * Acciones)
 			summaryViews[i].TotalShares = state.Shares
+			summaryViews[i].CurrentInvestment = state.Capital // Inversión actual = Capital restante (Cost basis)
 			summaryViews[i].CurrentValue = state.Shares * currentPrice
 			summaryViews[i].ProfitLoss = (currentPrice * state.Shares) - (wac * state.Shares)
 			// Rendimiento = ((Precio Actual - WAC) / WAC) * 100
@@ -2353,6 +2351,7 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 		} else {
 			// Si no hay acciones en cartera, poner todo en 0 excepto lo ya calculado
 			summaryViews[i].TotalShares = 0
+			summaryViews[i].CurrentInvestment = 0
 			summaryViews[i].CurrentValue = 0
 			summaryViews[i].ProfitLoss = 0
 			summaryViews[i].Performance = 0
