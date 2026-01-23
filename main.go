@@ -25,6 +25,12 @@ type Migration struct {
 	AppliedAt time.Time
 }
 
+// TickerGroup representa un grupo de tickers (ej: Tech, Finance, etc.)
+type TickerGroup struct {
+	gorm.Model
+	Name string `gorm:"uniqueIndex;not null"`
+}
+
 // Ticker representa un símbolo bursátil con su precio actual.
 type Ticker struct {
 	gorm.Model
@@ -32,6 +38,8 @@ type Ticker struct {
 	CurrentPrice       float64
 	YahooFinanceTicker string
 	UsdEur             bool
+	GroupID            *uint       // Nullable foreign key
+	Group              TickerGroup `gorm:"foreignKey:GroupID"`
 }
 
 // Investment representa una única compra de acciones en la BD.
@@ -78,6 +86,8 @@ type TickerView struct {
 	YahooFinanceTicker string
 	UsdEur             bool
 	HasShares          bool
+	GroupName          string
+	GroupID            uint
 }
 
 // InvestmentView representa los datos de inversión que se mostrarán en la página.
@@ -110,6 +120,7 @@ type TickerSummaryView struct {
 	WeightPercentage  float64
 	SnapshotChange    float64 // Cambio porcentual entre los últimos 2 snapshots
 	HasSnapshotChange bool    // Indica si hay datos suficientes para mostrar el cambio
+	GroupName         string
 }
 
 // SaleView representa los datos de venta que se mostrarán en la página.
@@ -573,7 +584,10 @@ func main() {
 	// Ruta para mostrar la página de precios
 	router.GET("/precios", func(c *gin.Context) {
 		var tickers []Ticker
-		db.Order("name").Find(&tickers)
+		db.Preload("Group").Order("name").Find(&tickers)
+
+		var groups []TickerGroup
+		db.Order("name").Find(&groups)
 
 		// Obtener los dos últimos snapshots
 		type SnapshotInfo struct {
@@ -637,6 +651,11 @@ func main() {
 				changeVal = *changePtr
 			}
 
+			gid := uint(0)
+			if t.GroupID != nil {
+				gid = *t.GroupID
+			}
+
 			tickerViews = append(tickerViews, TickerView{
 				ID:                 t.ID,
 				Name:               t.Name,
@@ -646,12 +665,15 @@ func main() {
 				HasSnapshotChange:  hasChange,
 				YahooFinanceTicker: t.YahooFinanceTicker,
 				UsdEur:             t.UsdEur,
-				HasShares:          sharesMap[t.ID] > 0.000001, // Pequeño margen para errores de punto flotante
+				HasShares:          sharesMap[t.ID] > 0.000001,
+				GroupName:          t.Group.Name,
+				GroupID:            gid,
 			})
 		}
 
 		c.HTML(http.StatusOK, "precios.html", gin.H{
 			"Tickers":    tickerViews,
+			"Groups":     groups,
 			"ActivePage": "precios",
 		})
 	})
@@ -767,6 +789,24 @@ func main() {
 		}
 
 		newTicker := Ticker{Name: name, CurrentPrice: price, YahooFinanceTicker: yahooTicker, UsdEur: usdeur}
+
+		// Manejar Grupo
+		groupIDStr := c.PostForm("group_id")
+		newGroupName := c.PostForm("new_group_name")
+
+		if newGroupName != "" {
+			var group TickerGroup
+			if db.Where("name = ?", newGroupName).First(&group).Error != nil {
+				group = TickerGroup{Name: newGroupName}
+				db.Create(&group)
+			}
+			newTicker.GroupID = &group.ID
+		} else if groupIDStr != "" && groupIDStr != "0" {
+			gid, _ := strconv.Atoi(groupIDStr)
+			ugid := uint(gid)
+			newTicker.GroupID = &ugid
+		}
+
 		db.Create(&newTicker)
 
 		log.Printf("Nuevo ticker creado: %s", name)
@@ -803,12 +843,37 @@ func main() {
 			price = ticker.CurrentPrice
 		}
 
+		// Manejar Grupo
+		groupIDStr := c.PostForm("group_id")
+		newGroupName := c.PostForm("new_group_name")
+		var gidPtr *uint
+
+		if newGroupName != "" {
+			var group TickerGroup
+			if db.Where("name = ?", newGroupName).First(&group).Error != nil {
+				group = TickerGroup{Name: newGroupName}
+				db.Create(&group)
+			}
+			gidPtr = &group.ID
+		} else if groupIDStr != "" {
+			if groupIDStr == "0" {
+				gidPtr = nil
+			} else {
+				gid, _ := strconv.Atoi(groupIDStr)
+				ugid := uint(gid)
+				gidPtr = &ugid
+			}
+		} else {
+			gidPtr = ticker.GroupID
+		}
+
 		// Actualizar campos usando Select para incluir campos vacíos
-		db.Model(&ticker).Select("Name", "CurrentPrice", "YahooFinanceTicker", "UsdEur").Updates(Ticker{
+		db.Model(&ticker).Select("Name", "CurrentPrice", "YahooFinanceTicker", "UsdEur", "GroupID").Updates(Ticker{
 			Name:               name,
 			CurrentPrice:       price,
 			YahooFinanceTicker: yahooTicker,
 			UsdEur:             usdeur,
+			GroupID:            gidPtr,
 		})
 
 		log.Printf("Ticker %d actualizado: %s", id, name)
@@ -1937,6 +2002,7 @@ func runMigrations(database *gorm.DB) error {
 		"006_add_usdeur_column":               migration006AddUsdEurColumn,
 		"007_create_ticker_notes_table":       migration007CreateTickerNotesTable,
 		"008_drop_tax_column":                 migration008DropTaxColumn,
+		"009_create_ticker_groups_table":      migration009CreateTickerGroupsTable,
 	}
 
 	// Obtener migraciones ya aplicadas
@@ -2200,15 +2266,19 @@ func migration008DropTaxColumn(database *gorm.DB) error {
 }
 
 func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, float64, float64, float64, map[uint]float64, float64, float64, int, float64, error) {
-	// 1. Obtener todos los tickers con sus precios
+	// 1. Obtener todos los tickers con sus precios y sus grupos
 	var tickers []Ticker
-	db.Find(&tickers)
+	db.Preload("Group").Find(&tickers)
 
 	tickerPrices := make(map[uint]float64)
 	tickerNames := make(map[uint]string)
+	tickerGroups := make(map[uint]string)
 	for _, t := range tickers {
 		tickerPrices[t.ID] = t.CurrentPrice
 		tickerNames[t.ID] = t.Name
+		if t.Group.Name != "" {
+			tickerGroups[t.ID] = t.Group.Name
+		}
 	}
 
 	// 2. Obtener todas las inversiones de la BD con preload del ticker
@@ -2258,7 +2328,11 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 	for _, view := range investmentViews {
 		summary, ok := summaries[view.TickerID]
 		if !ok {
-			summary = &TickerSummaryView{TickerID: view.TickerID, Ticker: view.Ticker}
+			summary = &TickerSummaryView{
+				TickerID:  view.TickerID,
+				Ticker:    view.Ticker,
+				GroupName: tickerGroups[view.TickerID],
+			}
 			summaries[view.TickerID] = summary
 		}
 
@@ -2487,4 +2561,30 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 	}
 
 	return investmentViews, summaryViews, saleViews, totalCapital, netProfitLoss, totalOperationCost, tickerPrices, portfolioPerformance, portfolioUtility, numPositions, totalPortfolioCurrentValue, nil
+}
+
+// migration009CreateTickerGroupsTable crea la tabla ticker_groups y agrega la columna group_id a tickers
+func migration009CreateTickerGroupsTable(database *gorm.DB) error {
+	log.Println("Creando tabla ticker_groups y actualizando tabla tickers...")
+
+	// Crear tabla ticker_groups si no existe
+	if !database.Migrator().HasTable("ticker_groups") {
+		if err := database.AutoMigrate(&TickerGroup{}); err != nil {
+			return err
+		}
+		log.Println("  Tabla ticker_groups creada exitosamente")
+	}
+
+	// Agregar columna group_id a tickers si no existe
+	if !database.Migrator().HasColumn(&Ticker{}, "GroupID") {
+		if err := database.Migrator().AddColumn(&Ticker{}, "GroupID"); err != nil {
+			return fmt.Errorf("error al agregar columna group_id: %v", err)
+		}
+		log.Println("  Columna group_id agregada exitosamente")
+
+		// Agregar llave foránea manualmente si es necesario (GORM suele hacerlo con AutoMigrate pero AddColumn no)
+		database.Exec("ALTER TABLE tickers ADD CONSTRAINT fk_tickers_group FOREIGN KEY (group_id) REFERENCES ticker_groups(id)")
+	}
+
+	return nil
 }

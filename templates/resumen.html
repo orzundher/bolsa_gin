@@ -35,6 +35,7 @@
                 <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                     <tr>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Ticker</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Grupo</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Costo Ponderado</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Acciones</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Valor Actual</th>
@@ -49,6 +50,7 @@
                     {{range .Summaries}}
                     <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer {{if gt .ProfitLoss 0.0}}bg-green-50 dark:bg-green-900/20{{else if lt .ProfitLoss 0.0}}bg-red-50 dark:bg-red-900/20{{end}}" data-shares="{{.TotalShares}}" onclick="window.location.href='/ticker/{{.TickerID}}'">
                         <th scope="row" class="px-6 py-4 font-bold text-gray-900 dark:text-white whitespace-nowrap">{{.Ticker}}</th>
+                        <td class="px-6 py-4 text-gray-500 dark:text-gray-400 font-semibold">{{if .GroupName}}{{.GroupName}}{{else}}—{{end}}</td>
                         <td class="px-6 py-4">{{printf "%.3f€" .CurrentInvestment}}</td>
                         <td class="px-6 py-4">{{printf "%.6f" .TotalShares}}</td>
                         <td class="px-6 py-4">{{printf "%.3f€" .CurrentValue}}</td>
