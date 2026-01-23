@@ -108,6 +108,8 @@ type TickerSummaryView struct {
 	Performance       float64
 	SalesProfit       float64
 	WeightPercentage  float64
+	SnapshotChange    float64 // Cambio porcentual entre los últimos 2 snapshots
+	HasSnapshotChange bool    // Indica si hay datos suficientes para mostrar el cambio
 }
 
 // SaleView representa los datos de venta que se mostrarán en la página.
@@ -446,6 +448,60 @@ func main() {
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
+		}
+
+		// Obtener los dos últimos snapshots para calcular cambios
+		type SnapshotInfo struct {
+			SnapshotID string
+			CreatedAt  time.Time
+		}
+		var snapshots []SnapshotInfo
+		db.Model(&PriceHistory{}).
+			Select("DISTINCT snapshot_id, MIN(created_at) as created_at").
+			Group("snapshot_id").
+			Order("created_at DESC").
+			Limit(2).
+			Scan(&snapshots)
+
+		// Crear un mapa para almacenar los cambios porcentuales por ticker
+		snapshotChanges := make(map[uint]*float64)
+
+		// Si hay al menos 2 snapshots, calcular los cambios
+		if len(snapshots) >= 2 {
+			lastSnapshotID := snapshots[0].SnapshotID
+			prevSnapshotID := snapshots[1].SnapshotID
+
+			// Obtener precios del último snapshot
+			var lastPrices []PriceHistory
+			db.Where("snapshot_id = ?", lastSnapshotID).Find(&lastPrices)
+			lastPriceMap := make(map[uint]float64)
+			for _, p := range lastPrices {
+				lastPriceMap[p.TickerID] = p.Price
+			}
+
+			// Obtener precios del snapshot anterior
+			var prevPrices []PriceHistory
+			db.Where("snapshot_id = ?", prevSnapshotID).Find(&prevPrices)
+			prevPriceMap := make(map[uint]float64)
+			for _, p := range prevPrices {
+				prevPriceMap[p.TickerID] = p.Price
+			}
+
+			// Calcular cambios porcentuales
+			for tickerID, lastPrice := range lastPriceMap {
+				if prevPrice, exists := prevPriceMap[tickerID]; exists && prevPrice > 0 {
+					change := ((lastPrice - prevPrice) / prevPrice) * 100
+					snapshotChanges[tickerID] = &change
+				}
+			}
+		}
+
+		// Agregar información de cambios de snapshot a los summaries
+		for i := range summaries {
+			if changePtr, exists := snapshotChanges[summaries[i].TickerID]; exists {
+				summaries[i].SnapshotChange = *changePtr
+				summaries[i].HasSnapshotChange = true
+			}
 		}
 
 		c.HTML(http.StatusOK, "resumen.html", gin.H{
@@ -1576,9 +1632,15 @@ func main() {
 		}
 
 		// WAC final de las acciones en cartera
+		// Usar un umbral pequeño (epsilon) para evitar problemas de precisión de punto flotante
+		const epsilon = 0.000001
 		portfolioWAC := 0.0
-		if currentShares > 0 {
+		if currentShares > epsilon {
 			portfolioWAC = currentCapital / currentShares
+		} else {
+			// Si las acciones son efectivamente cero, resetear también el capital
+			currentShares = 0.0
+			currentCapital = 0.0
 		}
 
 		// Construir saleViews con el WAC calculado
