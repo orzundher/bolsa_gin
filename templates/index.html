@@ -338,16 +338,19 @@
                         const day = parseInt(parts[0]);
                         const month = months[parts[1]];
                         const year = parseInt(parts[2]);
-                        const time = parts[3] ? parts[3].split(':') : ['0', '0'];
-                        const hour = parseInt(time[0]);
-                        const minute = parseInt(time[1]);
+                        
+                        // Handle HH:mm or HH:mm:ss
+                        const timeParts = parts[3].split(':');
+                        const hour = parseInt(timeParts[0]);
+                        const minute = parseInt(timeParts[1]);
+                        const second = timeParts[2] ? parseInt(timeParts[2]) : 0;
                         
                         if (isNaN(day) || month === undefined || isNaN(year) || isNaN(hour) || isNaN(minute)) {
                             console.error('Invalid date components:', {dateStr, day, month, year, hour, minute});
                             return null;
                         }
                         
-                        return new Date(year, month, day, hour, minute).getTime();
+                        return new Date(year, month, day, hour, minute, second).getTime();
                     } catch (error) {
                         console.error('Error parsing date:', dateStr, error);
                         return null;
@@ -385,10 +388,10 @@
                     },
                     colors: ['#10B981'], // Verde por defecto
                     markers: {
-                        size: 5,
+                        size: 3,
                         strokeWidth: 0,
                         hover: {
-                            size: 7
+                            size: 4
                         }
                     },
                     xaxis: {
@@ -482,10 +485,13 @@
                         const day = parseInt(parts[0]);
                         const month = months[parts[1]];
                         const year = parseInt(parts[2]);
-                        const time = parts[3] ? parts[3].split(':') : ['0', '0'];
-                        const hour = parseInt(time[0]);
-                        const minute = parseInt(time[1]);
-                        return new Date(year, month, day, hour, minute).getTime();
+                        
+                        const timeParts = parts[3].split(':');
+                        const hour = parseInt(timeParts[0]);
+                        const minute = parseInt(timeParts[1]);
+                        const second = timeParts[2] ? parseInt(timeParts[2]) : 0;
+                        
+                        return new Date(year, month, day, hour, minute, second).getTime();
                     } catch (error) {
                         return null;
                     }
@@ -515,7 +521,7 @@
                         enabled: false
                     },
                     stroke: {
-                        curve: 'stepline',
+                        curve: 'smooth',
                         width: 3
                     },
                     fill: {
@@ -529,10 +535,10 @@
                     },
                     colors: ['#3B82F6'], // Azul
                     markers: {
-                        size: 5,
+                        size: 3,
                         strokeWidth: 0,
                         hover: {
-                            size: 7
+                            size: 5
                         }
                     },
                     xaxis: {

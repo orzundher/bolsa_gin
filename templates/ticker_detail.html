@@ -326,17 +326,20 @@
                 const day = parseInt(parts[0]);
                 const month = months[parts[1]];
                 const year = parseInt(parts[2]);
-                const time = parts[3] ? parts[3].split(':') : ['0', '0'];
-                const hour = parseInt(time[0]);
-                const minute = parseInt(time[1]);
+                
+                // Handle HH:mm or HH:mm:ss
+                const timeParts = parts[3].split(':');
+                const hour = parseInt(timeParts[0]);
+                const minute = parseInt(timeParts[1]);
+                const second = timeParts[2] ? parseInt(timeParts[2]) : 0;
                 
                 if (isNaN(day) || month === undefined || isNaN(year) || isNaN(hour) || isNaN(minute)) {
                     console.error('Invalid date components:', {dateStr, day, month, year, hour, minute});
                     return null;
                 }
                 
-                const timestamp = new Date(year, month, day, hour, minute).getTime();
-                console.log('Parsed date:', dateStr, '→', timestamp, '→', new Date(timestamp));
+                const timestamp = new Date(year, month, day, hour, minute, second).getTime();
+                // console.log('Parsed date:', dateStr, '→', timestamp, '→', new Date(timestamp));
                 return timestamp;
             } catch (error) {
                 console.error('Error parsing date:', dateStr, error);
