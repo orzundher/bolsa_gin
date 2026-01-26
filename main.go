@@ -73,21 +73,6 @@ type PriceHistory struct {
 	Price      float64
 }
 
-// Note representa una anotación o recordatorio general.
-type Note struct {
-	gorm.Model
-	Date    time.Time
-	Content string
-}
-
-// TickerNote representa una anotación específica de un ticker.
-type TickerNote struct {
-	gorm.Model
-	TickerID uint
-	Ticker   Ticker `gorm:"foreignKey:TickerID"`
-	Date     time.Time
-	Content  string
-}
 
 // --- VISTAS ---
 
@@ -2210,21 +2195,6 @@ func migration004AddYahooFinanceTickerColumn(database *gorm.DB) error {
 	return nil
 }
 
-// migration005CreateNotesTable crea la tabla notes
-func migration005CreateNotesTable(database *gorm.DB) error {
-	log.Println("Creando tabla notes...")
-
-	if !database.Migrator().HasTable("notes") {
-		if err := database.AutoMigrate(&Note{}); err != nil {
-			return err
-		}
-		log.Println("  Tabla notes creada exitosamente")
-	} else {
-		log.Println("  Tabla notes ya existe")
-	}
-
-	return nil
-}
 
 // migration006AddUsdEurColumn agrega la columna usdeur a la tabla tickers
 func migration006AddUsdEurColumn(database *gorm.DB) error {
@@ -2242,25 +2212,6 @@ func migration006AddUsdEurColumn(database *gorm.DB) error {
 	return nil
 }
 
-// migration007CreateTickerNotesTable crea la tabla ticker_notes
-func migration007CreateTickerNotesTable(database *gorm.DB) error {
-	log.Println("Creando tabla ticker_notes...")
-
-	if !database.Migrator().HasTable("ticker_notes") {
-		if err := database.AutoMigrate(&TickerNote{}); err != nil {
-			return err
-		}
-		log.Println("  Tabla ticker_notes creada exitosamente")
-
-		// Crear índice para mejorar consultas por ticker
-		database.Exec("CREATE INDEX idx_ticker_notes_ticker_id ON ticker_notes(ticker_id)")
-		log.Println("  Índice creado en ticker_notes")
-	} else {
-		log.Println("  Tabla ticker_notes ya existe")
-	}
-
-	return nil
-}
 
 // migration008DropTaxColumn elimina la columna withheld_tax de la tabla sales
 func migration008DropTaxColumn(database *gorm.DB) error {
