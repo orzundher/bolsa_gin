@@ -51,9 +51,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const shares = editBtn.dataset.shares;
             const salePrice = editBtn.dataset.salePrice;
             const operationCost = editBtn.dataset.operationCost;
-            const withheldTax = editBtn.dataset.withheldTax;
             
-            openEditModal(id, ticker, tickerId, saleDate, shares, salePrice, operationCost, withheldTax);
+            openEditModal(id, ticker, tickerId, saleDate, shares, salePrice, operationCost);
         }
     });
 });
@@ -78,15 +77,13 @@ function submitEditForm() {
     const shares = parseFloat(document.getElementById('edit_shares').value);
     const salePrice = parseFloat(document.getElementById('edit_sale_price').value);
     const operationCost = parseFloat(document.getElementById('edit_operation_cost').value) || 0;
-    const withheldTax = parseFloat(document.getElementById('edit_withheld_tax').value) || 0;
 
     const data = {
         ticker_id: tickerId,
         sale_date: saleDateStr, // Already in YYYY-MM-DDTHH:MM format from datetime-local input
         shares: shares,
         sale_price: salePrice,
-        operation_cost: operationCost,
-        withheld_tax: withheldTax
+        operation_cost: operationCost
     };
 
     fetch(`/api/sale/${saleId}`, {
@@ -153,32 +150,26 @@ function updateTableRow(data) {
         operationCostCell.textContent = data.operation_cost.toFixed(2) + '€';
     }
 
-    // Update withheld tax
-    const withheldTaxCell = row.querySelector('[data-field="withheld_tax"]');
-    if (withheldTaxCell) {
-        withheldTaxCell.textContent = data.withheld_tax.toFixed(2) + '€';
-    }
-
     // Update total sale value
     const totalSaleValueCell = row.querySelector('[data-field="total_sale_value"]');
     if (totalSaleValueCell) {
         totalSaleValueCell.textContent = data.total_sale_value.toFixed(2) + '€';
     }
 
-    // Update performance with color
-    const performanceCell = row.querySelector('[data-field="performance"]');
-    if (performanceCell) {
-        performanceCell.textContent = data.performance.toFixed(2) + '%';
-        performanceCell.className = 'px-6 py-4 font-medium ' + (data.performance >= 0
+    // Update sale performance with color
+    const salePerformanceCell = row.querySelector('[data-field="sale_performance"]');
+    if (salePerformanceCell) {
+        salePerformanceCell.textContent = (data.performance >= 0 ? '+' : '') + data.performance.toFixed(2) + '%';
+        salePerformanceCell.className = 'px-6 py-4 font-bold ' + (data.performance >= 0
             ? 'text-green-600 dark:text-green-400'
             : 'text-red-600 dark:text-red-400');
     }
 
-    // Update profit with color
-    const profitCell = row.querySelector('[data-field="profit"]');
-    if (profitCell) {
-        profitCell.textContent = data.profit.toFixed(2) + '€';
-        profitCell.className = 'px-6 py-4 font-medium ' + (data.profit >= 0
+    // Update sale utility with color
+    const saleUtilityCell = row.querySelector('[data-field="sale_utility"]');
+    if (saleUtilityCell) {
+        saleUtilityCell.textContent = (data.profit >= 0 ? '+' : '') + data.profit.toFixed(2) + '€';
+        saleUtilityCell.className = 'px-6 py-4 font-bold ' + (data.profit >= 0
             ? 'text-green-600 dark:text-green-400'
             : 'text-red-600 dark:text-red-400');
     }
@@ -193,14 +184,13 @@ function updateTableRow(data) {
         editButton.dataset.shares = data.shares;
         editButton.dataset.salePrice = data.sale_price;
         editButton.dataset.operationCost = data.operation_cost;
-        editButton.dataset.withheldTax = data.withheld_tax;
     }
 }
 
 /**
  * Opens the edit sale modal and populates it with the sale data
  */
-function openEditModal(id, ticker, tickerId, saleDate, shares, salePrice, operationCost, withheldTax) {
+function openEditModal(id, ticker, tickerId, saleDate, shares, salePrice, operationCost) {
     // Populate form fields
     document.getElementById('edit_sale_id').value = id;
     document.getElementById('edit_ticker_id').value = tickerId;
@@ -235,7 +225,6 @@ function openEditModal(id, ticker, tickerId, saleDate, shares, salePrice, operat
     document.getElementById('edit_shares').value = shares;
     document.getElementById('edit_sale_price').value = salePrice;
     document.getElementById('edit_operation_cost').value = operationCost;
-    document.getElementById('edit_withheld_tax').value = withheldTax;
 
     // Show modal
     const modal = document.getElementById('editSaleModal');
