@@ -38,6 +38,7 @@ type Ticker struct {
 	CurrentPrice       float64
 	YahooFinanceTicker string
 	UsdEur             bool
+	Active             bool        `gorm:"default:true"`
 	GroupID            *uint       // Nullable foreign key
 	Group              TickerGroup `gorm:"foreignKey:GroupID"`
 }
@@ -73,7 +74,6 @@ type PriceHistory struct {
 	Price      float64
 }
 
-
 // --- VISTAS ---
 
 // TickerView representa los datos de un ticker para mostrar en la UI.
@@ -89,6 +89,7 @@ type TickerView struct {
 	HasShares          bool
 	GroupName          string
 	GroupID            uint
+	Active             bool
 }
 
 // InvestmentView representa los datos de inversión que se mostrarán en la página.
@@ -655,6 +656,7 @@ func main() {
 				HasShares:          sharesMap[t.ID] > 0.000001,
 				GroupName:          t.Group.Name,
 				GroupID:            gid,
+				Active:             t.Active,
 			})
 		}
 
@@ -775,7 +777,7 @@ func main() {
 			return
 		}
 
-		newTicker := Ticker{Name: name, CurrentPrice: price, YahooFinanceTicker: yahooTicker, UsdEur: usdeur}
+		newTicker := Ticker{Name: name, CurrentPrice: price, YahooFinanceTicker: yahooTicker, UsdEur: usdeur, Active: true}
 
 		// Manejar Grupo
 		groupIDStr := c.PostForm("group_id")
@@ -819,6 +821,7 @@ func main() {
 		priceStr := strings.Replace(c.PostForm("current_price"), ",", ".", -1)
 		yahooTicker := c.PostForm("yahoo_finance_ticker")
 		usdeur := c.PostForm("usdeur") == "on"
+		active := c.PostForm("active") == "on"
 
 		if name == "" {
 			c.String(http.StatusBadRequest, "El nombre del ticker es obligatorio.")
@@ -855,12 +858,13 @@ func main() {
 		}
 
 		// Actualizar campos usando Select para incluir campos vacíos
-		db.Model(&ticker).Select("Name", "CurrentPrice", "YahooFinanceTicker", "UsdEur", "GroupID").Updates(Ticker{
+		db.Model(&ticker).Select("Name", "CurrentPrice", "YahooFinanceTicker", "UsdEur", "GroupID", "Active").Updates(Ticker{
 			Name:               name,
 			CurrentPrice:       price,
 			YahooFinanceTicker: yahooTicker,
 			UsdEur:             usdeur,
 			GroupID:            gidPtr,
+			Active:             active,
 		})
 
 		log.Printf("Ticker %d actualizado: %s", id, name)
@@ -890,6 +894,23 @@ func main() {
 		db.Delete(&Ticker{}, id)
 		log.Printf("Ticker %d eliminado", id)
 		c.Redirect(http.StatusFound, "/precios")
+	})
+
+	// Ruta para activar/desactivar un ticker
+	router.POST("/toggle-ticker-active/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, _ := strconv.Atoi(idStr)
+
+		var ticker Ticker
+		if err := db.First(&ticker, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Ticker no encontrado"})
+			return
+		}
+
+		ticker.Active = !ticker.Active
+		db.Save(&ticker)
+
+		c.JSON(http.StatusOK, gin.H{"success": true, "active": ticker.Active})
 	})
 
 	// Ruta para crear un snapshot de precios
@@ -1966,6 +1987,7 @@ func runMigrations(database *gorm.DB) error {
 		"007_create_ticker_notes_table":       migration007CreateTickerNotesTable,
 		"008_drop_tax_column":                 migration008DropTaxColumn,
 		"009_create_ticker_groups_table":      migration009CreateTickerGroupsTable,
+		"010_add_active_column_to_tickers":    migration010AddActiveColumnToTickers,
 	}
 
 	// Obtener migraciones ya aplicadas
@@ -2195,7 +2217,6 @@ func migration004AddYahooFinanceTickerColumn(database *gorm.DB) error {
 	return nil
 }
 
-
 // migration006AddUsdEurColumn agrega la columna usdeur a la tabla tickers
 func migration006AddUsdEurColumn(database *gorm.DB) error {
 	log.Println("Agregando columna usdeur a tabla tickers...")
@@ -2211,7 +2232,6 @@ func migration006AddUsdEurColumn(database *gorm.DB) error {
 
 	return nil
 }
-
 
 // migration008DropTaxColumn elimina la columna withheld_tax de la tabla sales
 func migration008DropTaxColumn(database *gorm.DB) error {
@@ -2549,6 +2569,28 @@ func migration009CreateTickerGroupsTable(database *gorm.DB) error {
 
 		// Agregar llave foránea manualmente si es necesario (GORM suele hacerlo con AutoMigrate pero AddColumn no)
 		database.Exec("ALTER TABLE tickers ADD CONSTRAINT fk_tickers_group FOREIGN KEY (group_id) REFERENCES ticker_groups(id)")
+	}
+
+	return nil
+}
+
+// migration010AddActiveColumnToTickers agrega la columna active a la tabla tickers y la inicializa en true
+func migration010AddActiveColumnToTickers(database *gorm.DB) error {
+	log.Println("Agregando columna active a tabla tickers...")
+
+	if !database.Migrator().HasColumn(&Ticker{}, "Active") {
+		if err := database.Migrator().AddColumn(&Ticker{}, "Active"); err != nil {
+			return fmt.Errorf("error al agregar columna active: %v", err)
+		}
+		log.Println("  Columna active agregada exitosamente")
+	} else {
+		log.Println("  Columna active ya existe")
+	}
+
+	// Asegurarse de que todos los registros actuales estén activos
+	log.Println("Activando todos los tickers existentes...")
+	if err := database.Model(&Ticker{}).Where("1=1").Update("active", true).Error; err != nil {
+		return fmt.Errorf("error al activar tickers: %v", err)
 	}
 
 	return nil
