@@ -78,18 +78,20 @@ type PriceHistory struct {
 
 // TickerView representa los datos de un ticker para mostrar en la UI.
 type TickerView struct {
-	ID                 uint
-	Name               string
-	CurrentPrice       float64
-	UpdatedAt          string
-	SnapshotChange     float64 // Cambio porcentual entre los últimos 2 snapshots
-	HasSnapshotChange  bool    // Indica si hay datos suficientes para mostrar el cambio
-	YahooFinanceTicker string
-	UsdEur             bool
-	HasShares          bool
-	GroupName          string
-	GroupID            uint
-	Active             bool
+	ID                      uint
+	Name                    string
+	CurrentPrice            float64
+	UpdatedAt               string
+	SnapshotChange          float64 // Cambio porcentual entre los últimos 2 snapshots
+	HasSnapshotChange       bool    // Indica si hay datos suficientes para mostrar el cambio
+	YahooFinanceTicker      string
+	UsdEur                  bool
+	HasShares               bool
+	GroupName               string
+	GroupID                 uint
+	Active                  bool
+	CurrentToSnapshotPct    float64 // Cambio porcentual entre precio actual y último snapshot
+	HasCurrentToSnapshotPct bool    // Indica si hay datos para mostrar el cambio actual vs snapshot
 }
 
 // InvestmentView representa los datos de inversión que se mostrarán en la página.
@@ -594,27 +596,31 @@ func main() {
 		snapshotChanges := make(map[uint]*float64)
 
 		// Si hay al menos 2 snapshots, calcular los cambios
-		if len(snapshots) >= 2 {
-			lastSnapshotID := snapshots[0].SnapshotID
-			prevSnapshotID := snapshots[1].SnapshotID
+		// Mapas para precios de snapshots
+		lastPriceMap := make(map[uint]float64)
 
-			// Obtener precios del último snapshot
+		// Si hay al menos 1 snapshot, cargarlo para comparar con actual
+		if len(snapshots) >= 1 {
+			lastSnapshotID := snapshots[0].SnapshotID
 			var lastPrices []PriceHistory
 			db.Where("snapshot_id = ?", lastSnapshotID).Find(&lastPrices)
-			lastPriceMap := make(map[uint]float64)
 			for _, p := range lastPrices {
 				lastPriceMap[p.TickerID] = p.Price
 			}
+		}
 
-			// Obtener precios del snapshot anterior
+		// Si hay al menos 2 snapshots, calcular cambios entre snapshots (SnapshotChange)
+		if len(snapshots) >= 2 {
+			prevSnapshotID := snapshots[1].SnapshotID
 			var prevPrices []PriceHistory
 			db.Where("snapshot_id = ?", prevSnapshotID).Find(&prevPrices)
+
 			prevPriceMap := make(map[uint]float64)
 			for _, p := range prevPrices {
 				prevPriceMap[p.TickerID] = p.Price
 			}
 
-			// Calcular cambios porcentuales
+			// Calcular cambios porcentuales entre snapshots
 			for tickerID, lastPrice := range lastPriceMap {
 				if prevPrice, exists := prevPriceMap[tickerID]; exists && prevPrice > 0 {
 					change := ((lastPrice - prevPrice) / prevPrice) * 100
@@ -644,19 +650,29 @@ func main() {
 				gid = *t.GroupID
 			}
 
+			// Calcular cambio vs último snapshot
+			currentToSnapshotPct := 0.0
+			hasCurrentToSnapshotPct := false
+			if lastSnapPrice, ok := lastPriceMap[t.ID]; ok && lastSnapPrice > 0 {
+				currentToSnapshotPct = ((t.CurrentPrice - lastSnapPrice) / lastSnapPrice) * 100
+				hasCurrentToSnapshotPct = true
+			}
+
 			tickerViews = append(tickerViews, TickerView{
-				ID:                 t.ID,
-				Name:               t.Name,
-				CurrentPrice:       t.CurrentPrice,
-				UpdatedAt:          t.UpdatedAt.Format("02 Jan 2006 15:04"),
-				SnapshotChange:     changeVal,
-				HasSnapshotChange:  hasChange,
-				YahooFinanceTicker: t.YahooFinanceTicker,
-				UsdEur:             t.UsdEur,
-				HasShares:          sharesMap[t.ID] > 0.000001,
-				GroupName:          t.Group.Name,
-				GroupID:            gid,
-				Active:             t.Active,
+				ID:                      t.ID,
+				Name:                    t.Name,
+				CurrentPrice:            t.CurrentPrice,
+				UpdatedAt:               t.UpdatedAt.Format("02 Jan 2006 15:04"),
+				SnapshotChange:          changeVal,
+				HasSnapshotChange:       hasChange,
+				YahooFinanceTicker:      t.YahooFinanceTicker,
+				UsdEur:                  t.UsdEur,
+				HasShares:               sharesMap[t.ID] > 0.000001,
+				GroupName:               t.Group.Name,
+				GroupID:                 gid,
+				Active:                  t.Active,
+				CurrentToSnapshotPct:    currentToSnapshotPct,
+				HasCurrentToSnapshotPct: hasCurrentToSnapshotPct,
 			})
 		}
 

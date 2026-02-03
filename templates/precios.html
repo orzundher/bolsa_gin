@@ -145,6 +145,7 @@
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">En Cartera</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Precio Actual</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Cambio Snapshots</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Diferencia Actual</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Estado</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Última Actualización</th>
                         <th scope="col" class="px-6 py-3">Acciones</th>
@@ -191,6 +192,29 @@
                                             <path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
                                         </svg>
                                         {{printf "%.2f" .SnapshotChange}}%
+                                    </span>
+                                {{else}}
+                                    <span class="text-gray-500 dark:text-gray-400">0.00%</span>
+                                {{end}}
+                            {{else}}
+                                <span class="text-gray-400 dark:text-gray-500">—</span>
+                            {{end}}
+                        </td>
+                        <td class="px-6 py-4">
+                            {{if .HasCurrentToSnapshotPct}}
+                                {{if gt .CurrentToSnapshotPct 0.0}}
+                                    <span class="inline-flex items-center text-green-600 dark:text-green-400 font-semibold">
+                                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                        +{{printf "%.2f" .CurrentToSnapshotPct}}%
+                                    </span>
+                                {{else if lt .CurrentToSnapshotPct 0.0}}
+                                    <span class="inline-flex items-center text-red-600 dark:text-red-400 font-semibold">
+                                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                        {{printf "%.2f" .CurrentToSnapshotPct}}%
                                     </span>
                                 {{else}}
                                     <span class="text-gray-500 dark:text-gray-400">0.00%</span>
