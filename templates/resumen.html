@@ -20,13 +20,22 @@
     <div class="p-4 sm:ml-64">
         <div class="p-4 mt-14">
 
-        <!-- Toggle para mostrar/ocultar tickers con pocas acciones -->
-        <div class="mb-4 flex items-center">
+        <!-- Header Container with Toggle and Export Button -->
+        <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <!-- Toggle para mostrar/ocultar tickers con pocas acciones -->
             <label class="inline-flex items-center cursor-pointer">
                 <input type="checkbox" id="showSignificantTickersOnly" class="sr-only peer">
                 <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                 <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Mostrar solo tickers con más de 0.000001 acciones</span>
             </label>
+
+            <!-- Botón Exportar TOML -->
+            <a href="/export-resumen-toml" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:ring-4 focus:outline-none focus:ring-indigo-300 dark:bg-indigo-500 dark:hover:bg-indigo-600 dark:focus:ring-indigo-800">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Exportar TOML
+            </a>
         </div>
 
         <!-- Summary Table -->

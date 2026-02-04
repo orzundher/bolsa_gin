@@ -511,6 +511,45 @@ func main() {
 		})
 	})
 
+	// Ruta para exportar la tabla resumen a TOML
+	router.GET("/export-resumen-toml", func(c *gin.Context) {
+		_, summaries, _, _, _, _, _, _, _, _, _, err := getInvestmentData()
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
+			return
+		}
+
+		var b strings.Builder
+		b.WriteString("# Resumen de Inversiones\n")
+		b.WriteString(fmt.Sprintf("# Fecha de exportación: %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
+
+		for _, s := range summaries {
+			// Solo exportar si hay acciones actualmente
+			if s.TotalShares > 0 {
+				b.WriteString("[[tickers]]\n")
+				b.WriteString(fmt.Sprintf("symbol = \"%s\"\n", s.Ticker))
+				b.WriteString(fmt.Sprintf("shares = %.6f\n", s.TotalShares))
+				b.WriteString(fmt.Sprintf("invested = %.2f\n", s.CurrentInvestment))
+				b.WriteString(fmt.Sprintf("cost = %.2f\n", s.TotalCost))
+				b.WriteString(fmt.Sprintf("value = %.2f\n", s.CurrentValue))
+				b.WriteString(fmt.Sprintf("profit_loss = %.2f\n", s.ProfitLoss))
+				b.WriteString(fmt.Sprintf("performance = %.2f\n", s.Performance))
+				b.WriteString(fmt.Sprintf("sales_profit = %.2f\n", s.SalesProfit))
+				b.WriteString(fmt.Sprintf("weight = %.2f\n", s.WeightPercentage))
+				if s.GroupName != "" {
+					b.WriteString(fmt.Sprintf("group = \"%s\"\n", s.GroupName))
+				}
+				b.WriteString("\n")
+			}
+		}
+
+		// Configurar headers para descarga
+		filename := fmt.Sprintf("resumen_inversiones_%s.toml", time.Now().Format("20060102"))
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+		c.Header("Content-Type", "application/toml")
+		c.String(http.StatusOK, b.String())
+	})
+
 	// Ruta para mostrar la página de compras
 	router.GET("/compras", func(c *gin.Context) {
 		investments, summaries, _, _, _, _, _, _, _, _, _, err := getInvestmentData()
