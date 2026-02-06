@@ -1742,10 +1742,21 @@ func main() {
 		currentShares := 0.0
 		currentCapital := 0.0
 
+		// Datos para el gráfico de WAC
+		var wacChartDates []string
+		var wacChartValues []float64
+
 		for _, e := range events {
 			if e.Type == "buy" {
 				currentShares += e.Shares
 				currentCapital += e.Shares * e.Price
+
+				// Calcular nuevo WAC y registrar punto
+				if currentShares > 0 {
+					wac := currentCapital / currentShares
+					wacChartDates = append(wacChartDates, e.Date.Format("02 Jan 2006 15:04:05"))
+					wacChartValues = append(wacChartValues, wac)
+				}
 			} else if e.Type == "sell" {
 				wac := 0.0
 				if currentShares > 0 {
@@ -1756,6 +1767,12 @@ func main() {
 				// Reducir capital proporcionalmente al WAC
 				currentCapital -= e.Shares * wac
 				currentShares -= e.Shares
+
+				// Registrar punto también en la venta para mantener la línea
+				if wac > 0 {
+					wacChartDates = append(wacChartDates, e.Date.Format("02 Jan 2006 15:04:05"))
+					wacChartValues = append(wacChartValues, wac)
+				}
 			}
 		}
 
@@ -1763,6 +1780,21 @@ func main() {
 		// Usar un umbral pequeño (epsilon) para evitar problemas de precisión de punto flotante
 		const epsilon = 0.000001
 		portfolioWAC := 0.0
+
+		// Calcular WAC final
+		if currentShares > epsilon {
+			portfolioWAC = currentCapital / currentShares
+		} else {
+			// Si las acciones son efectivamente cero, resetear también el capital
+			currentShares = 0.0
+			currentCapital = 0.0
+		}
+
+		// Agregar punto final "NOW" para que la línea se extienda hasta el presente si tenemos acciones
+		if currentShares > epsilon && portfolioWAC > 0 {
+			wacChartDates = append(wacChartDates, time.Now().Format("02 Jan 2006 15:04:05"))
+			wacChartValues = append(wacChartValues, portfolioWAC)
+		}
 		if currentShares > epsilon {
 			portfolioWAC = currentCapital / currentShares
 		} else {
@@ -1874,6 +1906,8 @@ func main() {
 			"PurchaseChartPrices": purchaseChartPrices,
 			"SaleChartDates":      saleChartDates,
 			"SaleChartPrices":     saleChartPrices,
+			"WACChartDates":       wacChartDates,
+			"WACChartValues":      wacChartValues,
 			"Notes":               tickerNotes,
 			"ActivePage":          "resumen",
 		})
