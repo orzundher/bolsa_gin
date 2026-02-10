@@ -521,7 +521,8 @@ func main() {
 
 		var b strings.Builder
 		b.WriteString("# Resumen de Inversiones\n")
-		b.WriteString(fmt.Sprintf("# Fecha de exportación: %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
+		b.WriteString(fmt.Sprintf("# Fecha de exportación: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+		b.WriteString("currency = \"EUR\"\n\n")
 
 		for _, s := range summaries {
 			// Solo exportar si hay acciones actualmente

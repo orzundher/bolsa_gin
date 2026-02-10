@@ -81,10 +81,19 @@
             <div id="portfolioUtilityChart"></div>
         </div>
 
-        <!-- Distribución de la Cartera -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8 p-6">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Distribución por Ticker</h2>
-            <div id="portfolioDistributionChart"></div>
+        <!-- Distribución de la Cartera (Grid 2 columnas) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Distribución por Ticker -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Distribución por Ticker</h2>
+                <div id="portfolioDistributionChart"></div>
+            </div>
+
+            <!-- Distribución por Grupo -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Distribución por Grupo</h2>
+                <div id="groupDistributionChart"></div>
+            </div>
         </div>
 
         <!-- Gráfico de Evolución de Utilidad de Ventas -->
@@ -596,29 +605,40 @@
 
         /* Gráfico de Distribución de la Cartera */
         (function() {
-            const distributionLabels = [];
-            const distributionSeries = [];
+            // Distribución por Ticker
+            const tickerLabels = [];
+            const tickerSeries = [];
             
+            // Distribución por Grupo
+            const groupData = {};
+
             {{range .Summaries}}
             {{if gt .CurrentValue 0.0}}
-            distributionLabels.push('{{.Ticker}}');
-            distributionSeries.push({{.CurrentValue}});
+            // Datos por Ticker
+            tickerLabels.push('{{.Ticker}}');
+            tickerSeries.push({{.CurrentValue}});
+
+            // Datos por Grupo
+            const groupName = '{{if .GroupName}}{{.GroupName}}{{else}}Sin Grupo{{end}}';
+            if (!groupData[groupName]) {
+                groupData[groupName] = 0;
+            }
+            groupData[groupName] += {{.CurrentValue}};
             {{end}}
             {{end}}
 
-            if (distributionSeries.length > 0) {
-                const distributionOptions = {
-                    series: distributionSeries,
-                    labels: distributionLabels,
+            // Renderizar Gráfico por Ticker
+            if (tickerSeries.length > 0) {
+                const tickerOptions = {
+                    series: tickerSeries,
+                    labels: tickerLabels,
                     chart: {
                         type: 'donut',
-                        height: 500,
+                        height: 350,
                     },
                     legend: {
                         position: 'bottom',
-                        labels: {
-                            colors: '#9CA3AF'
-                        }
+                        labels: { colors: '#9CA3AF' }
                     },
                     plotOptions: {
                         pie: {
@@ -626,16 +646,11 @@
                                 size: '65%',
                                 labels: {
                                     show: true,
-                                    name: {
-                                        show: true,
-                                        color: '#9CA3AF'
-                                    },
+                                    name: { show: true, color: '#9CA3AF' },
                                     value: {
                                         show: true,
                                         color: '#fff',
-                                        formatter: function (val) {
-                                            return parseFloat(val).toFixed(2) + '€';
-                                        }
+                                        formatter: function (val) { return parseFloat(val).toFixed(2) + '€'; }
                                     },
                                     total: {
                                         show: true,
@@ -651,35 +666,74 @@
                         }
                     },
                     tooltip: {
-                        y: {
-                            formatter: function (val) {
-                                return val.toFixed(2) + '€';
-                            }
-                        }
+                        y: { formatter: function (val) { return val.toFixed(2) + '€'; } }
                     },
-                    theme: {
-                        mode: 'dark'
-                    },
-                    responsive: [{
-                        breakpoint: 480,
-                        options: {
-                            chart: {
-                                width: 300
-                            },
-                            legend: {
-                                position: 'bottom'
-                            }
-                        }
-                    }]
+                    theme: { mode: 'dark' }
                 };
 
-                const distributionChart = new ApexCharts(document.querySelector("#portfolioDistributionChart"), distributionOptions);
-                distributionChart.render();
+                const tickerChart = new ApexCharts(document.querySelector("#portfolioDistributionChart"), tickerOptions);
+                tickerChart.render();
             } else {
-                const el = document.getElementById('portfolioDistributionChart');
-                if (el) {
-                    el.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 py-8">No hay activos en cartera para mostrar la distribución</p>';
-                }
+                document.getElementById('portfolioDistributionChart').innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 py-8">No hay activos para mostrar</p>';
+            }
+
+            // Renderizar Gráfico por Grupo
+            const groupLabels = Object.keys(groupData);
+            const groupSeries = Object.values(groupData);
+
+            if (groupSeries.length > 0) {
+                const groupOptions = {
+                    series: groupSeries,
+                    labels: groupLabels,
+                    chart: {
+                        type: 'donut',
+                        height: 350,
+                    },
+                    legend: {
+                        position: 'bottom',
+                        labels: { colors: '#9CA3AF' }
+                    },
+                    plotOptions: {
+                        pie: {
+                            donut: {
+                                size: '65%',
+                                labels: {
+                                    show: true,
+                                    name: { show: true, color: '#9CA3AF' },
+                                    value: {
+                                        show: true,
+                                        color: '#fff',
+                                        formatter: function (val) { return parseFloat(val).toFixed(2) + '€'; }
+                                    },
+                                    total: {
+                                        show: true,
+                                        label: 'Total',
+                                        color: '#9CA3AF',
+                                        formatter: function (w) {
+                                            const sum = w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+                                            return sum.toFixed(2) + '€';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    dataLabels: {
+                        enabled: true,
+                         formatter: function (val) {
+                            return val.toFixed(1) + "%"
+                        },
+                    },
+                    tooltip: {
+                        y: { formatter: function (val) { return val.toFixed(2) + '€'; } }
+                    },
+                    theme: { mode: 'dark' }
+                };
+
+                const groupChart = new ApexCharts(document.querySelector("#groupDistributionChart"), groupOptions);
+                groupChart.render();
+            } else {
+                document.getElementById('groupDistributionChart').innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 py-8">No hay activos para mostrar</p>';
             }
         })();
     </script>
