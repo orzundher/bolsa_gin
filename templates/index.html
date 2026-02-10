@@ -613,7 +613,7 @@
             const groupData = {};
 
             {{range .Summaries}}
-            {{if gt .CurrentValue 0.0}}
+            {{if and (gt .CurrentValue 0.0) (gt .TotalShares 0.000001)}}
             {
                 // Datos por Ticker
                 tickerLabels.push('{{.Ticker}}');
