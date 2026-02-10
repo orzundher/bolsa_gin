@@ -614,16 +614,18 @@
 
             {{range .Summaries}}
             {{if gt .CurrentValue 0.0}}
-            // Datos por Ticker
-            tickerLabels.push('{{.Ticker}}');
-            tickerSeries.push({{.CurrentValue}});
+            {
+                // Datos por Ticker
+                tickerLabels.push('{{.Ticker}}');
+                tickerSeries.push({{.CurrentValue}});
 
-            // Datos por Grupo
-            const groupName = '{{if .GroupName}}{{.GroupName}}{{else}}Sin Grupo{{end}}';
-            if (!groupData[groupName]) {
-                groupData[groupName] = 0;
+                // Datos por Grupo
+                const groupName = '{{if .GroupName}}{{.GroupName}}{{else}}Sin Grupo{{end}}';
+                if (!groupData[groupName]) {
+                    groupData[groupName] = 0;
+                }
+                groupData[groupName] += {{.CurrentValue}};
             }
-            groupData[groupName] += {{.CurrentValue}};
             {{end}}
             {{end}}
 
@@ -637,8 +639,7 @@
                         height: 350,
                     },
                     legend: {
-                        position: 'bottom',
-                        labels: { colors: '#9CA3AF' }
+                        show: false
                     },
                     plotOptions: {
                         pie: {
@@ -690,8 +691,7 @@
                         height: 350,
                     },
                     legend: {
-                        position: 'bottom',
-                        labels: { colors: '#9CA3AF' }
+                        show: false
                     },
                     plotOptions: {
                         pie: {
