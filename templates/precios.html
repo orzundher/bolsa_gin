@@ -19,6 +19,44 @@
         }
     </style>
     <script>
+        async function fetchPriceToConsole(yahooTicker, isYahooEur, btn) {
+            const originalContent = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<svg class="animate-spin w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Consultando...`;
+            
+            try {
+                const response = await fetch(`/api/fetch-price/${yahooTicker}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    let price, currency;
+                    if (isYahooEur) {
+                        price = data.precio_usd;
+                        currency = 'USD';
+                    } else {
+                        price = data.precio_eur;
+                        currency = 'EUR';
+                    }
+                    
+                    if (price !== undefined) {
+                        console.log(`%c [Yahoo Finance] %c ${yahooTicker}: %c ${price.toFixed(4)} ${currency} `, 
+                                    'background: #2563eb; color: #fff; border-radius: 3px 0 0 3px; padding: 2px 4px;',
+                                    'background: #f1f5f9; color: #1e293b; padding: 2px 4px;',
+                                    'background: #16a34a; color: #fff; border-radius: 0 3px 3px 0; padding: 2px 4px; font-weight: bold;');
+                    } else {
+                        console.error(`No se encontró el precio esperado (${currency}) para ${yahooTicker}`);
+                    }
+                } else {
+                    console.error('Error al obtener el precio:', data.error);
+                }
+            } catch (error) {
+                console.error('Error de conexión:', error);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
+        }
+
         // Funciones para el modal de agregar ticker (definidas antes del body)
         function openAddTickerModal() {
             const modal = document.getElementById('add-ticker-modal');
@@ -376,7 +414,15 @@
                             <input type="text" name="name" id="name-{{.ID}}" value="{{.Name}}" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                         </div>
                         <div>
-                            <label for="price-{{.ID}}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Precio Actual</label>
+                            <div class="flex items-center justify-between mb-2">
+                                <label for="price-{{.ID}}" class="block text-sm font-medium text-gray-900 dark:text-white">Precio Actual</label>
+                                {{if .YahooFinanceTicker}}
+                                <button type="button" onclick="fetchPriceToConsole('{{.YahooFinanceTicker}}', {{.YahooEur}}, this)" class="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                    Consultar Yahoo
+                                </button>
+                                {{end}}
+                            </div>
                             <input type="number" step="any" name="current_price" id="price-{{.ID}}" value="{{printf "%.4f" .CurrentPrice}}" autocomplete="off" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                         </div>
                         <div>

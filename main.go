@@ -2099,6 +2099,7 @@ func runMigrations(database *gorm.DB) error {
 		"009_create_ticker_groups_table":      migration009CreateTickerGroupsTable,
 		"010_add_active_column_to_tickers":    migration010AddActiveColumnToTickers,
 		"011_rename_usdeur_to_yahooeur":       migration011RenameUsdEurToYahooEur,
+		"012_fix_yahoo_eur_column":            migration012FixYahooEurColumn,
 	}
 
 	// Obtener migraciones ya aplicadas
@@ -2332,13 +2333,13 @@ func migration004AddYahooFinanceTickerColumn(database *gorm.DB) error {
 func migration006AddUsdEurColumn(database *gorm.DB) error {
 	log.Println("Agregando columna usdeur a tabla tickers...")
 
-	if !database.Migrator().HasColumn(&Ticker{}, "UsdEur") {
-		if err := database.Migrator().AddColumn(&Ticker{}, "UsdEur"); err != nil {
-			return fmt.Errorf("error al agregar columna usdeur: %v", err)
+	if !database.Migrator().HasColumn(&Ticker{}, "YahooEur") {
+		if err := database.Migrator().AddColumn(&Ticker{}, "YahooEur"); err != nil {
+			return fmt.Errorf("error al agregar columna yahoo_eur: %v", err)
 		}
-		log.Println("  Columna usdeur agregada exitosamente")
+		log.Println("  Columna yahoo_eur agregada exitosamente")
 	} else {
-		log.Println("  Columna usdeur ya existe")
+		log.Println("  Columna yahoo_eur ya existe")
 	}
 
 	return nil
@@ -2728,6 +2729,43 @@ func migration011RenameUsdEurToYahooEur(database *gorm.DB) error {
 		log.Println("  Valores invertidos (True ahora significa EUR)")
 	} else {
 		log.Println("  La migración ya parece haber sido aplicada o la columna no existe")
+	}
+
+	return nil
+}
+
+// migration012FixYahooEurColumn asegura que la columna se llame yahoo_eur y los valores estén invertidos correctamente.
+func migration012FixYahooEurColumn(database *gorm.DB) error {
+	log.Println("Ejecutando migración 012: Asegurando columna yahoo_eur...")
+
+	// 1. Verificar si existe la columna antigua usd_eur
+	var hasUsdEur bool
+	database.Raw("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tickers' AND column_name = 'usd_eur')").Scan(&hasUsdEur)
+
+	if hasUsdEur {
+		log.Println("  Detectada columna antigua 'usd_eur'. Renombrando e invirtiendo valores...")
+		if err := database.Exec("ALTER TABLE tickers RENAME COLUMN usd_eur TO yahoo_eur").Error; err != nil {
+			log.Printf("Aviso: No se pudo renombrar via SQL directo (tal vez ya se renombro): %v", err)
+		} else {
+			// Invertir: lo que era USD (true) ahora es NO EUR (false). Lo que era EUR (false) ahora es EUR (true).
+			if err := database.Exec("UPDATE tickers SET yahoo_eur = NOT yahoo_eur").Error; err != nil {
+				return fmt.Errorf("error al invertir valores: %v", err)
+			}
+			log.Println("  Columna 'usd_eur' migrada a 'yahoo_eur' satisfactoriamente")
+		}
+	} else {
+		// Verificar si existe yahoo_eur. Si no existe, crearla.
+		var hasYahooEur bool
+		database.Raw("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tickers' AND column_name = 'yahoo_eur')").Scan(&hasYahooEur)
+
+		if !hasYahooEur {
+			log.Println("  No se encontró 'usd_eur' ni 'yahoo_eur'. Creando 'yahoo_eur'...")
+			if err := database.Migrator().AddColumn(&Ticker{}, "YahooEur"); err != nil {
+				return err
+			}
+		} else {
+			log.Println("  La columna 'yahoo_eur' ya existe.")
+		}
 	}
 
 	return nil

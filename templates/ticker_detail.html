@@ -44,7 +44,7 @@
             <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8">
                 {{if .Ticker.YahooFinanceTicker}}
                 <div id="livePriceCard" class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 hidden border-2 border-green-500 dark:border-green-400">
-                    <h4 class="text-sm font-medium text-green-600 dark:text-green-400 mb-1">Precio Actual</h4>
+                    <h4 id="livePriceLabel" class="text-sm font-medium text-green-600 dark:text-green-400 mb-1">Precio Actual</h4>
                     <h3 id="livePriceValue" class="text-xl font-bold text-green-600 dark:text-green-400">—</h3>
                 </div>
                 {{end}}
@@ -538,11 +538,33 @@
                 const response = await fetch('/api/fetch-price/{{.Ticker.YahooFinanceTicker}}');
                 const data = await response.json();
                 console.log('Respuesta del servicio de precios:', data);
-                if (response.ok && data.precio_eur !== undefined) {
+                
+                if (response.ok) {
                     const card = document.getElementById('livePriceCard');
                     const valueEl = document.getElementById('livePriceValue');
-                    valueEl.textContent = data.precio_eur.toFixed(4) + '€';
-                    card.classList.remove('hidden');
+                    const labelEl = document.getElementById('livePriceLabel');
+                    
+                    const isYahooEur = {{.Ticker.YahooEur}};
+                    
+                    if (isYahooEur) {
+                        // Si el ticker es EUR, mostrar USD
+                        if (data.precio_usd !== undefined) {
+                            valueEl.textContent = data.precio_usd.toFixed(4) + '$';
+                            labelEl.textContent = 'Precio USD';
+                            card.classList.remove('hidden');
+                        } else {
+                            alert('No se encontró precio_usd en la respuesta');
+                        }
+                    } else {
+                        // Si el ticker es USD (o cualquier otro), mostrar EUR
+                        if (data.precio_eur !== undefined) {
+                            valueEl.textContent = data.precio_eur.toFixed(4) + '€';
+                            labelEl.textContent = 'Precio EUR';
+                            card.classList.remove('hidden');
+                        } else {
+                            alert('No se encontró precio_eur en la respuesta');
+                        }
+                    }
                 } else {
                     alert('Error al obtener el precio: ' + (data.error || JSON.stringify(data)));
                 }
