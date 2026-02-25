@@ -38,7 +38,7 @@ type Ticker struct {
 	Name               string `gorm:"uniqueIndex"`
 	CurrentPrice       float64
 	YahooFinanceTicker string
-	UsdEur             bool
+	YahooEur           bool
 	Active             bool        `gorm:"default:true"`
 	GroupID            *uint       // Nullable foreign key
 	Group              TickerGroup `gorm:"foreignKey:GroupID"`
@@ -86,7 +86,7 @@ type TickerView struct {
 	SnapshotChange          float64 // Cambio porcentual entre los últimos 2 snapshots
 	HasSnapshotChange       bool    // Indica si hay datos suficientes para mostrar el cambio
 	YahooFinanceTicker      string
-	UsdEur                  bool
+	YahooEur                bool
 	HasShares               bool
 	GroupName               string
 	GroupID                 uint
@@ -726,7 +726,7 @@ func main() {
 				SnapshotChange:          changeVal,
 				HasSnapshotChange:       hasChange,
 				YahooFinanceTicker:      t.YahooFinanceTicker,
-				UsdEur:                  t.UsdEur,
+				YahooEur:                t.YahooEur,
 				HasShares:               sharesMap[t.ID] > 0.000001,
 				GroupName:               t.Group.Name,
 				GroupID:                 gid,
@@ -834,7 +834,7 @@ func main() {
 		name := strings.ToUpper(c.PostForm("name"))
 		priceStr := strings.Replace(c.PostForm("current_price"), ",", ".", -1)
 		yahooTicker := c.PostForm("yahoo_finance_ticker")
-		usdeur := c.PostForm("usdeur") == "on"
+		yahooEur := c.PostForm("yahoo_eur") == "on"
 
 		if name == "" {
 			c.String(http.StatusBadRequest, "El nombre del ticker es obligatorio.")
@@ -853,7 +853,7 @@ func main() {
 			return
 		}
 
-		newTicker := Ticker{Name: name, CurrentPrice: price, YahooFinanceTicker: yahooTicker, UsdEur: usdeur, Active: true}
+		newTicker := Ticker{Name: name, CurrentPrice: price, YahooFinanceTicker: yahooTicker, YahooEur: yahooEur, Active: true}
 
 		// Manejar Grupo
 		groupIDStr := c.PostForm("group_id")
@@ -896,7 +896,7 @@ func main() {
 		name := strings.ToUpper(c.PostForm("name"))
 		priceStr := strings.Replace(c.PostForm("current_price"), ",", ".", -1)
 		yahooTicker := c.PostForm("yahoo_finance_ticker")
-		usdeur := c.PostForm("usdeur") == "on"
+		yahooEur := c.PostForm("yahoo_eur") == "on"
 		active := c.PostForm("active") == "on"
 
 		if name == "" {
@@ -934,11 +934,11 @@ func main() {
 		}
 
 		// Actualizar campos usando Select para incluir campos vacíos
-		db.Model(&ticker).Select("Name", "CurrentPrice", "YahooFinanceTicker", "UsdEur", "GroupID", "Active").Updates(Ticker{
+		db.Model(&ticker).Select("Name", "CurrentPrice", "YahooFinanceTicker", "YahooEur", "GroupID", "Active").Updates(Ticker{
 			Name:               name,
 			CurrentPrice:       price,
 			YahooFinanceTicker: yahooTicker,
-			UsdEur:             usdeur,
+			YahooEur:           yahooEur,
 			GroupID:            gidPtr,
 			Active:             active,
 		})
@@ -2098,6 +2098,7 @@ func runMigrations(database *gorm.DB) error {
 		"008_drop_tax_column":                 migration008DropTaxColumn,
 		"009_create_ticker_groups_table":      migration009CreateTickerGroupsTable,
 		"010_add_active_column_to_tickers":    migration010AddActiveColumnToTickers,
+		"011_rename_usdeur_to_yahooeur":       migration011RenameUsdEurToYahooEur,
 	}
 
 	// Obtener migraciones ya aplicadas
@@ -2701,6 +2702,32 @@ func migration010AddActiveColumnToTickers(database *gorm.DB) error {
 	log.Println("Activando todos los tickers existentes...")
 	if err := database.Model(&Ticker{}).Where("1=1").Update("active", true).Error; err != nil {
 		return fmt.Errorf("error al activar tickers: %v", err)
+	}
+
+	return nil
+}
+
+// migration011RenameUsdEurToYahooEur renombra la columna y voltea el valor booleano
+// Antes: true = USD, false = EUR. Ahora: true = EUR, false = USD.
+func migration011RenameUsdEurToYahooEur(database *gorm.DB) error {
+	log.Println("Renombrando columna usdeur a yahoo_eur e invirtiendo lógica...")
+
+	// 1. Renombrar si existe la antigua y no la nueva
+	if database.Migrator().HasColumn(&Ticker{}, "UsdEur") {
+		// En PostgreSQL GORM suele usar snake_case: UsdEur -> usd_eur
+		if err := database.Exec("ALTER TABLE tickers RENAME COLUMN usd_eur TO yahoo_eur").Error; err != nil {
+			log.Printf("Aviso: No se pudo renombrar via SQL directo (tal vez ya se renombro): %v", err)
+		} else {
+			log.Println("  Columna renombrada a yahoo_eur")
+		}
+
+		// 2. Invertir los valores: true -> false (era USD, ahora no es EUR), false -> true (era EUR, ahora es EUR)
+		if err := database.Exec("UPDATE tickers SET yahoo_eur = NOT yahoo_eur").Error; err != nil {
+			return fmt.Errorf("error al invertir valores booleanos: %v", err)
+		}
+		log.Println("  Valores invertidos (True ahora significa EUR)")
+	} else {
+		log.Println("  La migración ya parece haber sido aplicada o la columna no existe")
 	}
 
 	return nil

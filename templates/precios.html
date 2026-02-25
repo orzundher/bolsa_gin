@@ -29,7 +29,7 @@
             document.getElementById('add-name').value = '';
             document.getElementById('add-price').value = '';
             document.getElementById('add-yahoo').value = '';
-            document.getElementById('add-usdeur').checked = false;
+            document.getElementById('add-yahoo_eur').checked = false;
             // Focus en el primer campo
             setTimeout(() => document.getElementById('add-name').focus(), 100);
         }
@@ -321,8 +321,8 @@
                         </div>
                         <div class="flex items-center gap-4 mb-4">
                             <div class="flex items-center">
-                                <input id="add-usdeur" type="checkbox" name="usdeur" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
-                                <label for="add-usdeur" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">USD/EUR</label>
+                                <input id="add-yahoo_eur" type="checkbox" name="yahoo_eur" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                                <label for="add-yahoo_eur" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">Yahoo EUR</label>
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-4">
@@ -385,8 +385,8 @@
                         </div>
                         <div class="flex items-center gap-4 mb-4">
                             <div class="flex items-center">
-                                <input id="usdeur-{{.ID}}" type="checkbox" name="usdeur" {{if .UsdEur}}checked{{end}} class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
-                                <label for="usdeur-{{.ID}}" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">USD/EUR</label>
+                                <input id="yahoo_eur-{{.ID}}" type="checkbox" name="yahoo_eur" {{if .YahooEur}}checked{{end}} class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                                <label for="yahoo_eur-{{.ID}}" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">Yahoo EUR</label>
                             </div>
                             <div class="flex items-center">
                                 <input id="active-{{.ID}}" type="checkbox" name="active" {{if .Active}}checked{{end}} class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
