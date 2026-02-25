@@ -25,17 +25,31 @@
             <!-- Header con nombre del ticker y botón de volver -->
             <div class="flex items-center justify-between mb-6">
                 <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-                    Detalle de <span class="text-blue-600 dark:text-blue-400">{{.Ticker.Name}}</span>
+                    Detalle de <span class="text-blue-600 dark:text-blue-400">{{.Ticker.Name}}</span>{{if .Ticker.YahooFinanceTicker}} <span class="text-lg text-gray-400 dark:text-gray-500">({{.Ticker.YahooFinanceTicker}})</span>{{end}}
                 </h1>
-                <a href="/resumen" class="text-white bg-gray-600 hover:bg-gray-700 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-gray-700 dark:hover:bg-gray-600 focus:outline-none dark:focus:ring-gray-800">
-                    ← Volver
-                </a>
+                <div class="flex items-center gap-3">
+                    {{if .Ticker.YahooFinanceTicker}}
+                    <button id="fetchPriceBtn" onclick="fetchYahooPrice()" class="text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-green-700 dark:hover:bg-green-600 focus:outline-none dark:focus:ring-green-800 inline-flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        Precio Actual
+                    </button>
+                    {{end}}
+                    <a href="/resumen" class="text-white bg-gray-600 hover:bg-gray-700 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-gray-700 dark:hover:bg-gray-600 focus:outline-none dark:focus:ring-gray-800">
+                        ← Volver
+                    </a>
+                </div>
             </div>
 
             <!-- Resumen -->
             <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8">
+                {{if .Ticker.YahooFinanceTicker}}
+                <div id="livePriceCard" class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 hidden border-2 border-green-500 dark:border-green-400">
+                    <h4 class="text-sm font-medium text-green-600 dark:text-green-400 mb-1">Precio Actual</h4>
+                    <h3 id="livePriceValue" class="text-xl font-bold text-green-600 dark:text-green-400">—</h3>
+                </div>
+                {{end}}
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Precio Actual</h4>
+                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Último Precio</h4>
                     <h3 class="text-xl font-bold text-blue-600 dark:text-blue-400">{{printf "%.4f€" .Ticker.CurrentPrice}}</h3>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
@@ -513,6 +527,34 @@
         let tickerNoteModal = null;
         let tickerNoteFlatpickr = null;
         const currentTickerID = {{.Ticker.ID}};
+
+        {{if .Ticker.YahooFinanceTicker}}
+        async function fetchYahooPrice() {
+            const btn = document.getElementById('fetchPriceBtn');
+            const originalContent = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<svg class="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Consultando...`;
+            try {
+                const response = await fetch('/api/fetch-price/{{.Ticker.YahooFinanceTicker}}');
+                const data = await response.json();
+                console.log('Respuesta del servicio de precios:', data);
+                if (response.ok && data.precio_eur !== undefined) {
+                    const card = document.getElementById('livePriceCard');
+                    const valueEl = document.getElementById('livePriceValue');
+                    valueEl.textContent = data.precio_eur.toFixed(4) + '€';
+                    card.classList.remove('hidden');
+                } else {
+                    alert('Error al obtener el precio: ' + (data.error || JSON.stringify(data)));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al conectar con el servicio de precios');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
+        }
+        {{end}}
 
         // Volver a resumen con la tecla ESC
         document.addEventListener('DOMContentLoaded', function() {

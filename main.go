@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -339,6 +340,25 @@ func main() {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"success": true})
+	})
+
+	// Proxy: Obtener precio actual desde el servicio externo (evita CORS)
+	router.GET("/api/fetch-price/:yahoo_ticker", func(c *gin.Context) {
+		yahooTicker := c.Param("yahoo_ticker")
+		resp, err := http.Get(fmt.Sprintf("http://localhost:3010/precio/%s", yahooTicker))
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "No se puede conectar con el servicio de precios"})
+			return
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al leer la respuesta del servicio de precios"})
+			return
+		}
+
+		c.Data(resp.StatusCode, "application/json", body)
 	})
 
 	// API: Obtener historial de utilidad de ventas (basado en eventos reales, no snapshots)

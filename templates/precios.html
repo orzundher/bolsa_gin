@@ -176,7 +176,7 @@
                             </span>
                             {{end}}
                         </td>
-                        <td class="px-6 py-4">{{if .UsdEur}}{{printf "%.4f$" .CurrentPrice}}{{else}}{{printf "%.4f€" .CurrentPrice}}{{end}}</td>
+                        <td class="px-6 py-4">{{printf "%.4f€" .CurrentPrice}}</td>
                         <td class="px-6 py-4">
                             {{if .HasSnapshotChange}}
                                 {{if gt .SnapshotChange 0.0}}
@@ -377,7 +377,7 @@
                         </div>
                         <div>
                             <label for="price-{{.ID}}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Precio Actual</label>
-                            <input type="number" step="any" name="current_price" id="price-{{.ID}}" value="{{printf "%.4f" .CurrentPrice}}" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                            <input type="number" step="any" name="current_price" id="price-{{.ID}}" value="{{printf "%.4f" .CurrentPrice}}" autocomplete="off" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                         </div>
                         <div>
                             <label for="yahoo-{{.ID}}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Yahoo Finance Ticker</label>
