@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -987,6 +989,124 @@ func main() {
 		db.Save(&ticker)
 
 		c.JSON(http.StatusOK, gin.H{"success": true, "active": ticker.Active})
+	})
+
+	// Ruta para actualizar múltiples precios de tickers que tengan Yahoo Finance Ticker
+	router.POST("/precios", func(c *gin.Context) {
+		var input struct {
+			Tickers []string `json:"tickers"`
+		}
+		if err := c.BindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "JSON inválido: " + err.Error()})
+			return
+		}
+
+		if len(input.Tickers) == 0 {
+			c.JSON(http.StatusOK, gin.H{"success": true, "updated_count": 0, "results": []string{}})
+			return
+		}
+
+		// Preparar el cuerpo para el servicio externo
+		jsonData, err := json.Marshal(input)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al preparar la solicitud"})
+			return
+		}
+
+		// Llamar al servicio externo de precios (batch)
+		resp, err := http.Post("http://localhost:3010/precios", "application/json", bytes.NewBuffer(jsonData))
+		if err != nil {
+			log.Printf("Error conectando con servicio de precios: %v", err)
+			c.JSON(http.StatusBadGateway, gin.H{"error": "No se puede conectar con el servicio de precios"})
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			c.JSON(resp.StatusCode, gin.H{"error": "El servicio de precios devolvió un error"})
+			return
+		}
+
+		var priceResults []interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&priceResults); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al decodificar la respuesta del servicio"})
+			return
+		}
+
+		results := []gin.H{}
+		updatedCount := 0
+
+		for i, res := range priceResults {
+			yahooTickerName := input.Tickers[i]
+
+			// Si el servicio devolvió false para este ticker
+			if res == nil || res == false {
+				results = append(results, gin.H{
+					"ticker":  yahooTickerName,
+					"success": false,
+					"error":   "No se pudo obtener el precio",
+				})
+				continue
+			}
+
+			// Mapear el resultado
+			m, ok := res.(map[string]interface{})
+			if !ok {
+				results = append(results, gin.H{
+					"ticker":  yahooTickerName,
+					"success": false,
+					"error":   "Formato de respuesta inválido",
+				})
+				continue
+			}
+
+			// Buscar el ticker en nuestra DB (usando el campo YahooFinanceTicker)
+			var dbTicker Ticker
+			if err := db.Where("yahoo_finance_ticker = ?", yahooTickerName).First(&dbTicker).Error; err != nil {
+				results = append(results, gin.H{
+					"ticker":  yahooTickerName,
+					"success": false,
+					"error":   "Ticker no encontrado en la base de datos",
+				})
+				continue
+			}
+
+			// Lógica de precio según moneda (siguiendo el patrón existente)
+			var price float64
+			if dbTicker.YahooEur {
+				if v, ok := m["precio_usd"].(float64); ok {
+					price = v
+				}
+			} else {
+				if v, ok := m["precio_eur"].(float64); ok {
+					price = v
+				}
+			}
+
+			if price > 0 {
+				dbTicker.CurrentPrice = price
+				db.Save(&dbTicker)
+				updatedCount++
+				results = append(results, gin.H{
+					"ticker":  yahooTickerName,
+					"success": true,
+					"price":   price,
+				})
+			} else {
+				results = append(results, gin.H{
+					"ticker":  yahooTickerName,
+					"success": false,
+					"error":   "Precio inválido recibido",
+				})
+			}
+		}
+
+		log.Printf("Actualización masiva completada: %d tickers actualizados", updatedCount)
+		c.JSON(http.StatusOK, gin.H{
+			"success":       true,
+			"updated_count": updatedCount,
+			"results":       results,
+		})
 	})
 
 	// Ruta para crear un snapshot de precios

@@ -172,6 +172,12 @@
                         </svg>
                         Agregar Ticker
                     </button>
+                    <button type="button" id="updateAllPricesBtn" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:ring-4 focus:outline-none focus:ring-indigo-300 dark:bg-indigo-500 dark:hover:bg-indigo-600 dark:focus:ring-indigo-800">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Actualizar Precios Yahoo
+                    </button>
                     <button type="button" id="snapshotBtn" data-modal-target="snapshot-confirm-modal" data-modal-toggle="snapshot-confirm-modal" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-blue-800">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
@@ -569,6 +575,58 @@
             
             // Aplicar filtro inicial
             filterTickers();
+
+            // Lógica para actualizar todos los precios
+            const updateAllBtn = document.getElementById('updateAllPricesBtn');
+            if (updateAllBtn) {
+                updateAllBtn.addEventListener('click', async function() {
+                    // Obtener todos los tickers que tienen Yahoo Ticker
+                    const tickers = [];
+                    {{range .Tickers}}
+                        {{if .YahooFinanceTicker}}
+                            tickers.push('{{.YahooFinanceTicker}}');
+                        {{end}}
+                    {{end}}
+                    
+                    if (tickers.length === 0) {
+                        alert('No hay tickers con nombre de Yahoo configurado.');
+                        return;
+                    }
+                    
+                    if (!confirm(`¿Actualizar los precios de ${tickers.length} tickers desde Yahoo Finance?`)) {
+                        return;
+                    }
+                    
+                    const originalContent = updateAllBtn.innerHTML;
+                    updateAllBtn.disabled = true;
+                    updateAllBtn.innerHTML = `<svg class="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Actualizando...`;
+                    
+                    try {
+                        const response = await fetch('/precios', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ tickers: tickers })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            alert(`✓ Se han actualizado ${data.updated_count} precios correctamente.`);
+                            window.location.reload();
+                        } else {
+                            alert('✗ Error al actualizar precios: ' + (data.error || 'error desconocido'));
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('✗ Error de conexión con el servidor');
+                    } finally {
+                        updateAllBtn.disabled = false;
+                        updateAllBtn.innerHTML = originalContent;
+                    }
+                });
+            }
 
             const confirmSnapshotBtn = document.getElementById('confirm-snapshot-btn');
             // ... rest of the snapshot logic ...
