@@ -65,29 +65,64 @@ class TableSorter {
 
     init() {
         document.addEventListener('DOMContentLoaded', () => {
-            document.querySelectorAll('.sortable').forEach(th => {
-                th.addEventListener('click', () => {
-                    const table = th.closest('table');
-                    const tbody = table.querySelector('tbody');
-                    const thIndex = Array.from(th.parentNode.children).indexOf(th);
-                    const currentIsAsc = th.classList.contains('sort-asc');
+            const path = window.location.pathname;
+            
+            document.querySelectorAll('table').forEach((table, tableIndex) => {
+                const tableId = table.id || `table-${tableIndex}`;
+                const storageKey = `sort_${path}_${tableId}`;
+                
+                const sortables = table.querySelectorAll('.sortable');
+                if (sortables.length === 0) return;
 
-                    // Reset all sort indicators
-                    document.querySelectorAll('.sortable').forEach(h => {
-                        h.classList.remove('sort-asc', 'sort-desc');
+                // Load saved sort
+                const savedSort = JSON.parse(localStorage.getItem(storageKey));
+                
+                sortables.forEach((th, thIndex) => {
+                    th.addEventListener('click', () => {
+                        const thRealIndex = Array.from(th.parentNode.children).indexOf(th);
+                        const currentIsAsc = th.classList.contains('sort-asc');
+                        const newAsc = !currentIsAsc;
+
+                        this.sortTable(table, thRealIndex, newAsc);
+                        
+                        // Save sort preference
+                        localStorage.setItem(storageKey, JSON.stringify({
+                            index: thRealIndex,
+                            asc: newAsc
+                        }));
                     });
 
-                    // Set current sort direction
-                    th.classList.toggle('sort-asc', !currentIsAsc);
-                    th.classList.toggle('sort-desc', currentIsAsc);
-
-                    // Sort table rows
-                    Array.from(tbody.querySelectorAll('tr'))
-                        .sort(this.comparer(thIndex, !currentIsAsc))
-                        .forEach(tr => tbody.appendChild(tr));
+                    // Apply saved sort if this is the correct column
+                    if (savedSort && Array.from(th.parentNode.children).indexOf(th) === savedSort.index) {
+                        this.sortTable(table, savedSort.index, savedSort.asc);
+                    }
                 });
             });
         });
+    }
+
+    sortTable(table, index, asc) {
+        const tbody = table.querySelector('tbody');
+        const headers = table.querySelectorAll('.sortable');
+        const th = Array.from(table.querySelectorAll('th, td')).find(el => 
+            el.tagName === 'TH' && Array.from(el.parentNode.children).indexOf(el) === index
+        );
+
+        // Reset all sort indicators for this table
+        headers.forEach(h => {
+            h.classList.remove('sort-asc', 'sort-desc');
+        });
+
+        // Set current sort direction if header found
+        if (th && th.classList.contains('sortable')) {
+            th.classList.toggle('sort-asc', asc);
+            th.classList.toggle('sort-desc', !asc);
+        }
+
+        // Sort table rows
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        rows.sort(this.comparer(index, asc))
+            .forEach(tr => tbody.appendChild(tr));
     }
 }
 
