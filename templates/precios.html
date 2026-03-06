@@ -483,7 +483,7 @@
 
     <!-- Flowbite JS -->
     <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
-    <script src="/static/js/table-sort.js"></script>
+    <script src="/static/js/table-sort.js?v=2"></script>
     
     <script>
         // Cerrar modal al hacer clic fuera
@@ -514,7 +514,7 @@
         function filterTickers() {
             const showInactive = document.getElementById('showInactiveToggle').checked;
             const rows = document.querySelectorAll('#tickersTable tbody tr');
-            
+
             rows.forEach(row => {
                 const isActive = row.getAttribute('data-active') === 'true';
                 if (isActive || showInactive) {
@@ -523,7 +523,7 @@
                     row.style.display = 'none';
                 }
             });
-            
+
             // Guardar preferencia
             localStorage.setItem('precios_showInactive', showInactive);
         }
