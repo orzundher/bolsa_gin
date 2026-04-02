@@ -254,7 +254,10 @@ func main() {
 			return
 		}
 
-		date, err := time.Parse("2006-01-02", input.Date)
+		date, err := time.ParseInLocation("2006-01-02", input.Date, time.Local)
+		if err == nil {
+			date = date.UTC()
+		}
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Formato de fecha inválido"})
 			return
@@ -454,7 +457,7 @@ func main() {
 			lastDate, _ := time.Parse("02 Jan 2006 15:04:05", lastDateStr) // Formato interno usado arriba
 
 			if lastDate.Before(now) {
-				dates = append(dates, now.Format("02 Jan 2006 15:04:05"))
+				dates = append(dates, now.Local().Format("02 Jan 2006 15:04:05"))
 				utilities = append(utilities, totalSalesUtility)
 			}
 		}
@@ -543,7 +546,7 @@ func main() {
 
 		var b strings.Builder
 		b.WriteString("# Resumen de Inversiones\n")
-		b.WriteString(fmt.Sprintf("# Fecha de exportación: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+		b.WriteString(fmt.Sprintf("# Fecha de exportación: %s\n", time.Now().Local().Format("2006-01-02 15:04:05")))
 		b.WriteString("currency = \"EUR\"\n\n")
 
 		for _, s := range summaries {
@@ -724,7 +727,7 @@ func main() {
 				ID:                      t.ID,
 				Name:                    t.Name,
 				CurrentPrice:            t.CurrentPrice,
-				UpdatedAt:               t.UpdatedAt.Format("02 Jan 2006 15:04"),
+				UpdatedAt:               t.UpdatedAt.Local().Format("02 Jan 2006 15:04"),
 				SnapshotChange:          changeVal,
 				HasSnapshotChange:       hasChange,
 				YahooFinanceTicker:      t.YahooFinanceTicker,
@@ -1225,6 +1228,7 @@ func main() {
 				return
 			}
 		}
+		purchaseDate = purchaseDate.UTC()
 
 		// Verificar que el ticker existe
 		var ticker Ticker
@@ -1298,6 +1302,7 @@ func main() {
 				return
 			}
 		}
+		saleDate = saleDate.UTC()
 
 		// Verificar que el ticker existe
 		var ticker Ticker
@@ -1425,7 +1430,7 @@ func main() {
 		var purchasesList []PurchaseInfo
 		for _, inv := range investments {
 			purchasesList = append(purchasesList, PurchaseInfo{
-				Date:   inv.PurchaseDate.Format("02 Jan 2006 15:04"),
+				Date:   inv.PurchaseDate.Local().Format("02 Jan 2006 15:04"),
 				Shares: inv.Shares,
 				Price:  inv.PurchasePrice,
 				Total:  inv.Shares * inv.PurchasePrice,
@@ -1437,7 +1442,7 @@ func main() {
 
 		c.JSON(http.StatusOK, gin.H{
 			"ticker":        sale.Ticker.Name,
-			"sale_date":     sale.SaleDate.Format("02 Jan 2006 15:04"),
+			"sale_date":     sale.SaleDate.Local().Format("02 Jan 2006 15:04"),
 			"shares":        sale.Shares,
 			"sale_price":    sale.SalePrice,
 			"purchases":     purchasesList,
@@ -1508,6 +1513,7 @@ func main() {
 		if err != nil {
 			purchaseDate, _ = time.ParseInLocation("2006-01-02", purchaseDateStr, time.Local)
 		}
+		purchaseDate = purchaseDate.UTC()
 
 		// Actualizar el registro
 		db.Model(&investment).Updates(map[string]interface{}{
@@ -1555,6 +1561,7 @@ func main() {
 		if err != nil {
 			purchaseDate, _ = time.ParseInLocation("2006-01-02", input.PurchaseDate, time.Local)
 		}
+		purchaseDate = purchaseDate.UTC()
 
 		// Actualizar el registro
 		db.Model(&investment).Updates(map[string]interface{}{
@@ -1578,7 +1585,7 @@ func main() {
 			"id":               id,
 			"ticker_id":        input.TickerID,
 			"ticker":           ticker.Name,
-			"purchase_date":    purchaseDate.Format("02 Jan 2006 15:04"),
+			"purchase_date":    purchaseDate.Local().Format("02 Jan 2006 15:04"),
 			"shares":           input.Shares,
 			"purchase_price":   input.PurchasePrice,
 			"operation_cost":   input.OperationCost,
@@ -1608,7 +1615,7 @@ func main() {
 			"id":             investment.ID,
 			"ticker_id":      investment.TickerID,
 			"ticker":         investment.Ticker.Name,
-			"purchase_date":  investment.PurchaseDate.Format("2006-01-02T15:04"),
+			"purchase_date":  investment.PurchaseDate.Local().Format("2006-01-02T15:04"),
 			"shares":         investment.Shares,
 			"purchase_price": investment.PurchasePrice,
 			"operation_cost": investment.OperationCost,
@@ -1648,6 +1655,7 @@ func main() {
 		if err != nil {
 			saleDate, _ = time.ParseInLocation("2006-01-02", input.SaleDate, time.Local)
 		}
+		saleDate = saleDate.UTC()
 
 		// Actualizar el registro
 		db.Model(&sale).Updates(map[string]interface{}{
@@ -1820,7 +1828,7 @@ func main() {
 				ID:              i.ID,
 				TickerID:        i.TickerID,
 				Ticker:          ticker.Name,
-				PurchaseDate:    i.PurchaseDate.Format("02 Jan 2006 15:04:05"),
+				PurchaseDate:    i.PurchaseDate.Local().Format("02 Jan 2006 15:04:05"),
 				Shares:          i.Shares,
 				PurchasePrice:   i.PurchasePrice,
 				OperationCost:   i.OperationCost,
@@ -1933,7 +1941,7 @@ func main() {
 
 		// Agregar punto final "NOW" para que la línea se extienda hasta el presente si tenemos acciones
 		if currentShares > epsilon && portfolioWAC > 0 {
-			wacChartDates = append(wacChartDates, time.Now().Format("02 Jan 2006 15:04:05"))
+			wacChartDates = append(wacChartDates, time.Now().Local().Format("02 Jan 2006 15:04:05"))
 			wacChartValues = append(wacChartValues, portfolioWAC)
 		}
 		if currentShares > epsilon {
@@ -1962,7 +1970,7 @@ func main() {
 				ID:              s.ID,
 				TickerID:        s.TickerID,
 				Ticker:          ticker.Name,
-				SaleDate:        s.SaleDate.Format("02 Jan 2006 15:04:05"),
+				SaleDate:        s.SaleDate.Local().Format("02 Jan 2006 15:04:05"),
 				Shares:          s.Shares,
 				SalePrice:       s.SalePrice,
 				OperationCost:   s.OperationCost,
@@ -2176,12 +2184,19 @@ func setupDatabase() (*gorm.DB, error) {
 		return nil, fmt.Errorf("falta la variable de entorno DATABASE_URL")
 	}
 
-	// Agregar parámetro para desactivar prepared statements (necesario para connection pooler de Supabase)
-	if !strings.Contains(dsn, "prepared_statements") {
+	// Agregar parámetros necesarios
+	if !strings.Contains(dsn, "prepare") {
 		if strings.Contains(dsn, "?") {
 			dsn += "&prepare=false"
 		} else {
 			dsn += "?prepare=false"
+		}
+	}
+	if !strings.Contains(dsn, "TimeZone") {
+		if strings.Contains(dsn, "?") {
+			dsn += "&TimeZone=UTC"
+		} else {
+			dsn += "?TimeZone=UTC"
 		}
 	}
 
@@ -2523,7 +2538,7 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			ID:              i.ID,
 			TickerID:        i.TickerID,
 			Ticker:          tickerName,
-			PurchaseDate:    i.PurchaseDate.Format("02 Jan 2006 15:04"),
+			PurchaseDate:    i.PurchaseDate.Local().Format("02 Jan 2006 15:04"),
 			Shares:          i.Shares,
 			PurchasePrice:   i.PurchasePrice,
 			OperationCost:   i.OperationCost,
@@ -2760,7 +2775,7 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			ID:              s.ID,
 			TickerID:        s.TickerID,
 			Ticker:          tickerName,
-			SaleDate:        s.SaleDate.Format("02 Jan 2006 15:04"),
+			SaleDate:        s.SaleDate.Local().Format("02 Jan 2006 15:04"),
 			Shares:          s.Shares,
 			SalePrice:       s.SalePrice,
 			OperationCost:   s.OperationCost,
