@@ -153,12 +153,14 @@ type SaleView struct {
 var db *gorm.DB
 
 func main() {
+
 	// Cargar variables de entorno desde .env
 	if err := godotenv.Load(); err != nil {
 		log.Println("No se encontró archivo .env, usando variables de entorno del sistema")
 	}
 
 	var err error
+
 	// Configurar la base de datos con GORM
 	db, err = setupDatabase()
 	if err != nil {
