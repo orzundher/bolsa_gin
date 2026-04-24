@@ -1151,6 +1151,7 @@ func main() {
 			return
 		}
 
+
 		log.Printf("Snapshot creado: %s con %d precios", snapshotID, len(priceHistories))
 		c.JSON(http.StatusOK, gin.H{
 			"success":    true,
@@ -2122,6 +2123,15 @@ func main() {
 		}
 		tickerStates := make(map[uint]TickerState)
 
+		// Cargar todos los price histories en una sola query y agrupar en memoria
+		// para evitar N queries (una por snapshot) contra Supabase.
+		var allPriceHistories []PriceHistory
+		db.Select("snapshot_id, ticker_id, price").Find(&allPriceHistories)
+		pricesBySnapshot := make(map[string][]PriceHistory, len(snapshots))
+		for _, ph := range allPriceHistories {
+			pricesBySnapshot[ph.SnapshotID] = append(pricesBySnapshot[ph.SnapshotID], ph)
+		}
+
 		var dates []string
 		var utilities []float64
 		eventIdx := 0
@@ -2148,12 +2158,8 @@ func main() {
 				eventIdx++
 			}
 
-			// Obtener precios de este snapshot para calcular utilidad unrealizada
-			var priceHistories []PriceHistory
-			db.Where("snapshot_id = ?", snapshot.SnapshotID).Find(&priceHistories)
-
 			totalUtility := 0.0
-			for _, ph := range priceHistories {
+			for _, ph := range pricesBySnapshot[snapshot.SnapshotID] {
 				state := tickerStates[ph.TickerID]
 				if state.Shares > 0.000001 {
 					wac := state.Capital / state.Shares
