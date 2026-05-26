@@ -77,6 +77,26 @@ type PriceHistory struct {
 	Price      float64
 }
 
+// Dividend representa un cobro de dividendo de un ticker.
+type Dividend struct {
+	gorm.Model
+	TickerID uint
+	Ticker   Ticker `gorm:"foreignKey:TickerID"`
+	Date     time.Time
+	Amount   float64 // Importe total recibido
+	Notes    string
+}
+
+// DividendView representa los datos de dividendo para mostrar en la UI.
+type DividendView struct {
+	ID       uint
+	TickerID uint
+	Ticker   string
+	Date     string
+	Amount   float64
+	Notes    string
+}
+
 // --- VISTAS ---
 
 // TickerView representa los datos de un ticker para mostrar en la UI.
@@ -128,6 +148,7 @@ type TickerSummaryView struct {
 	SnapshotChange    float64 // Cambio porcentual entre los últimos 2 snapshots
 	HasSnapshotChange bool    // Indica si hay datos suficientes para mostrar el cambio
 	GroupName         string
+	Dividends         float64 // Total de dividendos cobrados para este ticker
 }
 
 // SaleView representa los datos de venta que se mostrarán en la página.
@@ -190,6 +211,14 @@ func main() {
 		// Calcular Valor de Salida: Utilidad Ventas + Utilidad Cartera - Costos de Operación - Número de Posiciones
 		exitValue := totalSaleUtility + portfolioUtility - totalOperationCost - float64(numPositions)
 
+		// Calcular total de dividendos
+		var dividends []Dividend
+		db.Find(&dividends)
+		totalDividends := 0.0
+		for _, d := range dividends {
+			totalDividends += d.Amount
+		}
+
 		// Obtener notas
 		var notes []Note
 		db.Order("date desc").Find(&notes)
@@ -206,6 +235,7 @@ func main() {
 			"TotalCurrentValue":    totalCurrentValue,
 			"NumPositions":         numPositions,
 			"ExitValue":            exitValue,
+			"TotalDividends":       totalDividends,
 			"Notes":                notes,
 			"ActivePage":           "home",
 		})
@@ -532,6 +562,21 @@ func main() {
 			}
 		}
 
+		// Calcular dividendos por ticker
+		type DividendSum struct {
+			TickerID uint
+			Total    float64
+		}
+		var divSums []DividendSum
+		db.Model(&Dividend{}).Select("ticker_id, SUM(amount) as total").Group("ticker_id").Scan(&divSums)
+		divMap := make(map[uint]float64)
+		for _, d := range divSums {
+			divMap[d.TickerID] = d.Total
+		}
+		for i := range summaries {
+			summaries[i].Dividends = divMap[summaries[i].TickerID]
+		}
+
 		c.HTML(http.StatusOK, "resumen.html", gin.H{
 			"Summaries":  summaries,
 			"ActivePage": "resumen",
@@ -636,6 +681,175 @@ func main() {
 			"TickerShares": tickerShares,
 			"ActivePage":   "ventas",
 		})
+	})
+
+	// Ruta para mostrar la página de dividendos
+	router.GET("/dividendos", func(c *gin.Context) {
+		var dividends []Dividend
+		db.Preload("Ticker").Order("date desc").Find(&dividends)
+
+		var dividendViews []DividendView
+		totalDividends := 0.0
+		for _, d := range dividends {
+			dividendViews = append(dividendViews, DividendView{
+				ID:       d.ID,
+				TickerID: d.TickerID,
+				Ticker:   d.Ticker.Name,
+				Date:     d.Date.Local().Format("02 Jan 2006"),
+				Amount:   d.Amount,
+				Notes:    d.Notes,
+			})
+			totalDividends += d.Amount
+		}
+
+		var tickers []Ticker
+		db.Order("name").Find(&tickers)
+		var tickerViews []TickerView
+		for _, t := range tickers {
+			tickerViews = append(tickerViews, TickerView{ID: t.ID, Name: t.Name})
+		}
+
+		c.HTML(http.StatusOK, "dividendos.html", gin.H{
+			"Dividends":      dividendViews,
+			"TotalDividends": totalDividends,
+			"Tickers":        tickerViews,
+			"ActivePage":     "dividendos",
+		})
+	})
+
+	// API: Registrar un nuevo dividendo
+	router.POST("/api/dividend", func(c *gin.Context) {
+		var input struct {
+			TickerID uint    `json:"ticker_id"`
+			Date     string  `json:"date"`
+			Amount   float64 `json:"amount"`
+			Notes    string  `json:"notes"`
+		}
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos"})
+			return
+		}
+
+		date, err := time.ParseInLocation("2006-01-02", input.Date, time.Local)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Formato de fecha inválido"})
+			return
+		}
+
+		dividend := Dividend{
+			TickerID: input.TickerID,
+			Date:     date.UTC(),
+			Amount:   input.Amount,
+			Notes:    input.Notes,
+		}
+		if err := db.Create(&dividend).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al guardar el dividendo"})
+			return
+		}
+
+		var ticker Ticker
+		db.First(&ticker, input.TickerID)
+
+		c.JSON(http.StatusOK, gin.H{
+			"id":        dividend.ID,
+			"ticker_id": dividend.TickerID,
+			"ticker":    ticker.Name,
+			"date":      dividend.Date.Local().Format("02 Jan 2006"),
+			"amount":    dividend.Amount,
+			"notes":     dividend.Notes,
+		})
+	})
+
+	// API: Obtener datos de un dividendo
+	router.GET("/api/dividend/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+			return
+		}
+
+		var dividend Dividend
+		if err := db.Preload("Ticker").First(&dividend, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Dividendo no encontrado"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"id":        dividend.ID,
+			"ticker_id": dividend.TickerID,
+			"ticker":    dividend.Ticker.Name,
+			"date":      dividend.Date.Local().Format("2006-01-02"),
+			"amount":    dividend.Amount,
+			"notes":     dividend.Notes,
+		})
+	})
+
+	// API: Actualizar un dividendo
+	router.PUT("/api/dividend/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+			return
+		}
+
+		var dividend Dividend
+		if err := db.First(&dividend, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Dividendo no encontrado"})
+			return
+		}
+
+		var input struct {
+			TickerID uint    `json:"ticker_id"`
+			Date     string  `json:"date"`
+			Amount   float64 `json:"amount"`
+			Notes    string  `json:"notes"`
+		}
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos"})
+			return
+		}
+
+		date, err := time.ParseInLocation("2006-01-02", input.Date, time.Local)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Formato de fecha inválido"})
+			return
+		}
+
+		db.Model(&dividend).Updates(map[string]interface{}{
+			"ticker_id": input.TickerID,
+			"date":      date.UTC(),
+			"amount":    input.Amount,
+			"notes":     input.Notes,
+		})
+
+		var ticker Ticker
+		db.First(&ticker, input.TickerID)
+
+		c.JSON(http.StatusOK, gin.H{
+			"id":        id,
+			"ticker_id": input.TickerID,
+			"ticker":    ticker.Name,
+			"date":      date.Local().Format("02 Jan 2006"),
+			"amount":    input.Amount,
+			"notes":     input.Notes,
+		})
+	})
+
+	// API: Eliminar un dividendo
+	router.DELETE("/api/dividend/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+			return
+		}
+		if err := db.Delete(&Dividend{}, id).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar el dividendo"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true})
 	})
 
 	// Ruta para mostrar la página de precios
@@ -1738,7 +1952,7 @@ func main() {
 			"id":               id,
 			"ticker_id":        input.TickerID,
 			"ticker":           ticker.Name,
-			"sale_date":        saleDate.Format("02 Jan 2006 15:04"),
+			"sale_date":        saleDate.Local().Format("02 Jan 2006 15:04"),
 			"shares":           input.Shares,
 			"sale_price":       input.SalePrice,
 			"operation_cost":   input.OperationCost,
@@ -1767,7 +1981,7 @@ func main() {
 			"id":             sale.ID,
 			"ticker_id":      sale.TickerID,
 			"ticker":         sale.Ticker.Name,
-			"sale_date":      sale.SaleDate.Format("2006-01-02T15:04"),
+			"sale_date":      sale.SaleDate.Local().Format("2006-01-02T15:04"),
 			"shares":         sale.Shares,
 			"sale_price":     sale.SalePrice,
 			"operation_cost": sale.OperationCost,
@@ -2243,6 +2457,7 @@ func runMigrations(database *gorm.DB) error {
 		"010_add_active_column_to_tickers":    migration010AddActiveColumnToTickers,
 		"011_rename_usdeur_to_yahooeur":       migration011RenameUsdEurToYahooEur,
 		"012_fix_yahoo_eur_column":            migration012FixYahooEurColumn,
+		"013_create_dividends_table":          migration013CreateDividendsTable,
 	}
 
 	// Obtener migraciones ya aplicadas
@@ -2911,5 +3126,19 @@ func migration012FixYahooEurColumn(database *gorm.DB) error {
 		}
 	}
 
+	return nil
+}
+
+// migration013CreateDividendsTable crea la tabla dividends
+func migration013CreateDividendsTable(database *gorm.DB) error {
+	log.Println("Creando tabla dividends...")
+	if !database.Migrator().HasTable("dividends") {
+		if err := database.AutoMigrate(&Dividend{}); err != nil {
+			return fmt.Errorf("error al crear tabla dividends: %v", err)
+		}
+		log.Println("  Tabla dividends creada exitosamente")
+	} else {
+		log.Println("  Tabla dividends ya existe")
+	}
 	return nil
 }

@@ -23,7 +23,7 @@
         <div class="p-4 mt-14">
 
         <!-- Metrics Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-6 mb-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8 gap-6 mb-8">
             <!-- Número de Posiciones -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                 <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Posiciones</h4>
@@ -47,6 +47,14 @@
                 <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Utilidad Ventas</h4>
                 <h3 class="text-3xl font-bold {{if ge .TotalSaleUtility 0.0}}text-green-600 dark:text-green-400{{else}}text-red-600 dark:text-red-400{{end}}">
                     {{if ge .TotalSaleUtility 0.0}}+{{end}}{{printf "%.2f€" .TotalSaleUtility}}
+                </h3>
+            </div>
+
+            <!-- Dividendos -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Dividendos</h4>
+                <h3 class="text-3xl font-bold text-teal-600 dark:text-teal-400">
+                    {{if gt .TotalDividends 0.0}}+{{end}}{{printf "%.2f€" .TotalDividends}}
                 </h3>
             </div>
 
@@ -452,6 +460,8 @@
                             strokeDashArray: 5,
                             label: {
                                 borderColor: '#6B7280',
+                                position: 'left',
+                                offsetX: 100,
                                 style: {
                                     color: '#fff',
                                     background: '#6B7280'
