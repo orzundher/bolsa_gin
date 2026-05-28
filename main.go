@@ -208,9 +208,6 @@ func main() {
 			totalSaleUtility += s.SaleUtility
 		}
 
-		// Calcular Valor de Salida: Utilidad Ventas + Utilidad Cartera - Costos de Operación - Número de Posiciones
-		exitValue := totalSaleUtility + portfolioUtility - totalOperationCost - float64(numPositions)
-
 		// Calcular total de dividendos
 		var dividends []Dividend
 		db.Find(&dividends)
@@ -218,6 +215,9 @@ func main() {
 		for _, d := range dividends {
 			totalDividends += d.Amount
 		}
+
+		// Calcular Valor de Salida: Utilidad Ventas + Utilidad Cartera + Dividendos - Costos de Operación - Número de Posiciones
+		exitValue := totalSaleUtility + portfolioUtility + totalDividends - totalOperationCost - float64(numPositions)
 
 		// Obtener notas
 		var notes []Note

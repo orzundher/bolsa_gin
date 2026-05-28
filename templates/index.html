@@ -39,7 +39,7 @@
             <!-- Costos de Operación -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                 <h4 class="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">Costos de Operación</h4>
-                <h3 class="text-3xl font-bold text-gray-600 dark:text-gray-300">{{printf "%.3f€" .TotalOperationCost}}</h3>
+                <h3 class="text-3xl font-bold text-gray-600 dark:text-gray-300">{{printf "%.2f€" .TotalOperationCost}}</h3>
             </div>
 
             <!-- Utilidad Ventas -->
@@ -689,8 +689,9 @@
             }
 
             // Renderizar Gráfico por Grupo
-            const groupLabels = Object.keys(groupData);
-            const groupSeries = Object.values(groupData);
+            const groupEntries = Object.entries(groupData).sort((a, b) => b[1] - a[1]);
+            const groupLabels = groupEntries.map(e => e[0]);
+            const groupSeries = groupEntries.map(e => e[1]);
 
             if (groupSeries.length > 0) {
                 const groupOptions = {
