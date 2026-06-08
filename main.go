@@ -172,6 +172,7 @@ type SaleView struct {
 }
 
 var db *gorm.DB
+var preciosAPIKey string
 
 func main() {
 
@@ -382,7 +383,13 @@ func main() {
 	// Proxy: Obtener precio actual desde el servicio externo (evita CORS)
 	router.GET("/api/fetch-price/:yahoo_ticker", func(c *gin.Context) {
 		yahooTicker := c.Param("yahoo_ticker")
-		resp, err := http.Get(fmt.Sprintf("http://localhost:3010/precio/%s", yahooTicker))
+		req, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:3010/precio/%s", yahooTicker), nil)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creando la petición"})
+			return
+		}
+		req.Header.Set("X-API-Key", preciosAPIKey)
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			c.JSON(http.StatusBadGateway, gin.H{"error": "No se puede conectar con el servicio de precios"})
 			return
@@ -1233,7 +1240,15 @@ func main() {
 		}
 
 		// Llamar al servicio externo de precios (batch)
-		resp, err := http.Post("http://localhost:3010/precios", "application/json", bytes.NewBuffer(jsonData))
+		reqBatch, err := http.NewRequest("POST", "http://localhost:3010/precios", bytes.NewBuffer(jsonData))
+		if err != nil {
+			log.Printf("Error creando petición al servicio de precios: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creando la petición"})
+			return
+		}
+		reqBatch.Header.Set("Content-Type", "application/json")
+		reqBatch.Header.Set("X-API-Key", preciosAPIKey)
+		resp, err := http.DefaultClient.Do(reqBatch)
 		if err != nil {
 			log.Printf("Error conectando con servicio de precios: %v", err)
 			c.JSON(http.StatusBadGateway, gin.H{"error": "No se puede conectar con el servicio de precios"})
@@ -1364,7 +1379,6 @@ func main() {
 			})
 			return
 		}
-
 
 		log.Printf("Snapshot creado: %s con %d precios", snapshotID, len(priceHistories))
 		c.JSON(http.StatusOK, gin.H{
@@ -2390,6 +2404,8 @@ func main() {
 			"utilities": utilities,
 		})
 	})
+
+	preciosAPIKey = os.Getenv("PRECIOS_API_KEY")
 
 	port := os.Getenv("PORT")
 	if port == "" {
