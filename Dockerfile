@@ -32,6 +32,9 @@ COPY --from=builder /app/main .
 # Copiar las plantillas HTML
 COPY --from=builder /app/templates ./templates
 
+# Copiar archivos estáticos
+COPY --from=builder /app/static ./static
+
 # Exponer el puerto 8081
 EXPOSE 8081
 
