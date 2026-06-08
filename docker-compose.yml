@@ -5,4 +5,6 @@ services:
       - "80:8081"
     env_file:
       - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped

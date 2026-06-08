@@ -173,6 +173,7 @@ type SaleView struct {
 
 var db *gorm.DB
 var preciosAPIKey string
+var preciosBaseURL string
 
 func main() {
 
@@ -383,7 +384,7 @@ func main() {
 	// Proxy: Obtener precio actual desde el servicio externo (evita CORS)
 	router.GET("/api/fetch-price/:yahoo_ticker", func(c *gin.Context) {
 		yahooTicker := c.Param("yahoo_ticker")
-		req, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:3010/precio/%s", yahooTicker), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s/precio/%s", preciosBaseURL, yahooTicker), nil)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creando la petición"})
 			return
@@ -1240,7 +1241,7 @@ func main() {
 		}
 
 		// Llamar al servicio externo de precios (batch)
-		reqBatch, err := http.NewRequest("POST", "http://localhost:3010/precios", bytes.NewBuffer(jsonData))
+		reqBatch, err := http.NewRequest("POST", preciosBaseURL+"/precios", bytes.NewBuffer(jsonData))
 		if err != nil {
 			log.Printf("Error creando petición al servicio de precios: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creando la petición"})
@@ -2406,6 +2407,10 @@ func main() {
 	})
 
 	preciosAPIKey = os.Getenv("PRECIOS_API_KEY")
+	preciosBaseURL = os.Getenv("PRECIOS_BASE_URL")
+	if preciosBaseURL == "" {
+		preciosBaseURL = "http://localhost:3010"
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
