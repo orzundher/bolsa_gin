@@ -13,7 +13,48 @@ document.addEventListener('DOMContentLoaded', function () {
             saleDateHeader.click();
         }
     }
+});
 
+let fpAddSale = null;
+let fpEditSale = null;
+
+// Configuración de Flatpickr
+const flatpickrConfig = {
+    enableTime: true,
+    dateFormat: "Y-m-d\\TH:i",
+    altInput: true,
+    altFormat: "d.m.Y H:i",
+    time_24hr: true,
+    locale: "de"
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar Flatpickr si existen los elementos
+    const addInput = document.getElementById('add_sale_date');
+    if (addInput) {
+        fpAddSale = flatpickr(addInput, flatpickrConfig);
+    }
+    
+    const editInput = document.getElementById('edit_sale_date');
+    if (editInput) {
+        fpEditSale = flatpickr(editInput, flatpickrConfig);
+    }
+
+    // Event delegation for edit buttons
+    document.addEventListener('click', function(event) {
+        const editBtn = event.target.closest('.edit-sale-btn');
+        if (editBtn) {
+            const id = editBtn.dataset.saleId;
+            const ticker = editBtn.dataset.ticker;
+            const tickerId = editBtn.dataset.tickerId;
+            const saleDate = editBtn.dataset.saleDate;
+            const shares = editBtn.dataset.shares;
+            const salePrice = editBtn.dataset.salePrice;
+            const operationCost = editBtn.dataset.operationCost;
+            
+            openEditModal(id, ticker, tickerId, saleDate, shares, salePrice, operationCost);
+        }
+    });
 });
 
 /**
@@ -36,15 +77,13 @@ function submitEditForm() {
     const shares = parseFloat(document.getElementById('edit_shares').value);
     const salePrice = parseFloat(document.getElementById('edit_sale_price').value);
     const operationCost = parseFloat(document.getElementById('edit_operation_cost').value) || 0;
-    const withheldTax = parseFloat(document.getElementById('edit_withheld_tax').value) || 0;
 
     const data = {
         ticker_id: tickerId,
         sale_date: saleDateStr, // Already in YYYY-MM-DDTHH:MM format from datetime-local input
         shares: shares,
         sale_price: salePrice,
-        operation_cost: operationCost,
-        withheld_tax: withheldTax
+        operation_cost: operationCost
     };
 
     fetch(`/api/sale/${saleId}`, {
@@ -111,51 +150,47 @@ function updateTableRow(data) {
         operationCostCell.textContent = data.operation_cost.toFixed(2) + '€';
     }
 
-    // Update withheld tax
-    const withheldTaxCell = row.querySelector('[data-field="withheld_tax"]');
-    if (withheldTaxCell) {
-        withheldTaxCell.textContent = data.withheld_tax.toFixed(2) + '€';
-    }
-
     // Update total sale value
     const totalSaleValueCell = row.querySelector('[data-field="total_sale_value"]');
     if (totalSaleValueCell) {
         totalSaleValueCell.textContent = data.total_sale_value.toFixed(2) + '€';
     }
 
-    // Update performance with color
-    const performanceCell = row.querySelector('[data-field="performance"]');
-    if (performanceCell) {
-        performanceCell.textContent = data.performance.toFixed(2) + '%';
-        performanceCell.className = 'px-6 py-4 font-medium ' + (data.performance >= 0
+    // Update sale performance with color
+    const salePerformanceCell = row.querySelector('[data-field="sale_performance"]');
+    if (salePerformanceCell) {
+        salePerformanceCell.textContent = (data.performance >= 0 ? '+' : '') + data.performance.toFixed(2) + '%';
+        salePerformanceCell.className = 'px-6 py-4 font-bold ' + (data.performance >= 0
             ? 'text-green-600 dark:text-green-400'
             : 'text-red-600 dark:text-red-400');
     }
 
-    // Update profit with color
-    const profitCell = row.querySelector('[data-field="profit"]');
-    if (profitCell) {
-        profitCell.textContent = data.profit.toFixed(2) + '€';
-        profitCell.className = 'px-6 py-4 font-medium ' + (data.profit >= 0
+    // Update sale utility with color
+    const saleUtilityCell = row.querySelector('[data-field="sale_utility"]');
+    if (saleUtilityCell) {
+        saleUtilityCell.textContent = (data.profit >= 0 ? '+' : '') + data.profit.toFixed(2) + '€';
+        saleUtilityCell.className = 'px-6 py-4 font-bold ' + (data.profit >= 0
             ? 'text-green-600 dark:text-green-400'
             : 'text-red-600 dark:text-red-400');
     }
 
-    // Update the edit button onclick with new values
-    const editButton = row.querySelector('button[onclick^="openEditModal"]');
+    // Update the edit button data attributes with new values
+    const editButton = row.querySelector('.edit-sale-btn');
     if (editButton) {
-        editButton.setAttribute('onclick', `openEditModal(${data.id}, '${data.ticker}', ${data.ticker_id}, '${data.sale_date}', ${data.shares}, ${data.sale_price}, ${data.operation_cost}, ${data.withheld_tax})`);
+        editButton.dataset.saleId = data.id;
+        editButton.dataset.ticker = data.ticker;
+        editButton.dataset.tickerId = data.ticker_id;
+        editButton.dataset.saleDate = data.sale_date;
+        editButton.dataset.shares = data.shares;
+        editButton.dataset.salePrice = data.sale_price;
+        editButton.dataset.operationCost = data.operation_cost;
     }
 }
 
 /**
  * Opens the edit sale modal and populates it with the sale data
  */
-function openEditModal(id, ticker, tickerId, saleDate, shares, salePrice, operationCost, withheldTax) {
-    // Set form action
-    const form = document.getElementById('editSaleForm');
-    form.action = `/update-sale/${id}`;
-
+function openEditModal(id, ticker, tickerId, saleDate, shares, salePrice, operationCost) {
     // Populate form fields
     document.getElementById('edit_sale_id').value = id;
     document.getElementById('edit_ticker_id').value = tickerId;
@@ -178,14 +213,18 @@ function openEditModal(id, ticker, tickerId, saleDate, shares, salePrice, operat
             };
             const month = monthMap[monthStr] || '01';
 
-            dateInput.value = `${year}-${month}-${day}T${hour}:${minute}`;
+            const isoDate = `${year}-${month}-${day}T${hour}:${minute}`;
+            if (fpEditSale) {
+                fpEditSale.setDate(isoDate);
+            } else {
+                dateInput.value = isoDate;
+            }
         }
     }
 
     document.getElementById('edit_shares').value = shares;
     document.getElementById('edit_sale_price').value = salePrice;
     document.getElementById('edit_operation_cost').value = operationCost;
-    document.getElementById('edit_withheld_tax').value = withheldTax;
 
     // Show modal
     const modal = document.getElementById('editSaleModal');
@@ -228,7 +267,13 @@ function openAddSaleModal() {
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
 
-    document.getElementById('add_sale_date').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+    const isoDate = `${year}-${month}-${day}T${hours}:${minutes}`;
+    
+    if (fpAddSale) {
+        fpAddSale.setDate(isoDate);
+    } else {
+        document.getElementById('add_sale_date').value = isoDate;
+    }
 
     // Show modal
     modal.classList.remove('hidden');

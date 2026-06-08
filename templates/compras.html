@@ -5,10 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mis Compras</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/static/img/favicon.png">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Flowbite CSS -->
     <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
+    <!-- Flatpickr CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link href="/static/css/common.css" rel="stylesheet">
 </head>
 
@@ -19,13 +23,31 @@
         <div class="p-4 mt-14">
 
         <!-- Botón para abrir modal de nueva compra -->
-        <div class="mb-8">
+        <div class="flex justify-between items-center mb-8">
             <button type="button" onclick="openAddInvestmentModal()" class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">
                 <svg class="w-5 h-5 me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                 </svg>
                 Registrar Nueva Compra
             </button>
+            
+            <!-- Filters Container -->
+            <div class="flex items-center gap-4">
+                <!-- Ticker Filter -->
+                <select id="tickerFilter" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                    <option value="">Todos los Tickers</option>
+                    {{range .Tickers}}
+                    <option value="{{.Name}}">{{.Name}}</option>
+                    {{end}}
+                </select>
+
+                <!-- Toggle Filter -->
+                <label class="inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="showSignificantCompras" class="sr-only peer">
+                    <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                    <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Mostrar solo con > 0.000001 acciones</span>
+                </label>
+            </div>
         </div>
 
         <!-- Table -->
@@ -49,7 +71,7 @@
                 </thead>
                 <tbody id="investmentsTableBody">
                     {{range .Investments}}
-                    <tr id="investment-row-{{.ID}}" class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                    <tr id="investment-row-{{.ID}}" class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600" data-current-shares="{{index $.TickerShares .Ticker}}" data-ticker="{{.Ticker}}">
                         <th scope="row" class="px-4 py-3 font-bold text-gray-900 dark:text-white whitespace-nowrap" data-field="ticker">{{.Ticker}}</th>
                         <td class="px-4 py-3" data-field="purchase_date">{{.PurchaseDate}}</td>
                         <td class="px-4 py-3" data-field="operation_cost">{{printf "%.3f€" .OperationCost}}</td>
@@ -135,19 +157,19 @@
                         </div>
                         <div>
                             <label for="edit-purchase-date" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Fecha y Hora</label>
-                            <input type="datetime-local" name="purchase_date" id="edit-purchase-date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                            <input type="text" name="purchase_date" id="edit-purchase-date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                         </div>
                         <div>
                             <label for="edit-shares" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Acciones</label>
-                            <input type="number" step="any" name="shares" id="edit-shares" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                            <input type="number" step="any" name="shares" id="edit-shares" autocomplete="off" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                         </div>
                         <div>
                             <label for="edit-purchase-price" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Precio Compra</label>
-                            <input type="number" step="any" name="purchase_price" id="edit-purchase-price" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                            <input type="number" step="any" name="purchase_price" id="edit-purchase-price" autocomplete="off" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                         </div>
                         <div>
                             <label for="edit-operation-cost" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Costo Operación</label>
-                            <input type="number" step="any" name="operation_cost" id="edit-operation-cost" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                            <input type="number" step="any" name="operation_cost" id="edit-operation-cost" autocomplete="off" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
                         </div>
                     </div>
                     <div class="flex justify-end gap-2">
@@ -196,7 +218,7 @@
                             <!-- Fecha Compra -->
                             <div>
                                 <label for="add_purchase_date" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Fecha y Hora</label>
-                                <input type="datetime-local" name="purchase_date" id="add_purchase_date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                                <input type="text" name="purchase_date" id="add_purchase_date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                             </div>
                         </div>
                         
@@ -204,13 +226,13 @@
                             <!-- Acciones -->
                             <div>
                                 <label for="add_shares" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Acciones</label>
-                                <input type="number" step="any" name="shares" id="add_shares" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                                <input type="number" step="any" name="shares" id="add_shares" autocomplete="off" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                             </div>
                             
                             <!-- Precio Compra -->
                             <div>
                                 <label for="add_purchase_price" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Precio Compra</label>
-                                <input type="number" step="any" name="purchase_price" id="add_purchase_price" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                                <input type="number" step="any" name="purchase_price" id="add_purchase_price" autocomplete="off" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                             </div>
                         </div>
                         
@@ -218,7 +240,7 @@
                             <!-- Costo Operación -->
                             <div>
                                 <label for="add_operation_cost" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Costo Operación</label>
-                                <input type="number" step="any" name="operation_cost" id="add_operation_cost" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                                <input type="number" step="any" name="operation_cost" id="add_operation_cost" autocomplete="off" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
                             </div>
                         </div>
                     </div>
@@ -234,12 +256,50 @@
 
     <!-- Flowbite JS -->
     <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+    <!-- Flatpickr JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/de.js"></script>
     <script src="/static/js/table-sort.js"></script>
     
     <script>
         let editModal = null;
+        let fpEdit = null;
+        let fpAdd = null;
+
+        // Configuración común para Flatpickr
+        const flatpickrConfig = {
+            enableTime: true,
+            dateFormat: "Y-m-d\\TH:i", // Formato para el servidor
+            altInput: true,
+            altFormat: "d.m.Y H:i",     // Formato visual (Alemán/24h)
+            time_24hr: true,
+            locale: "de"
+        };
         
         document.addEventListener('DOMContentLoaded', function() {
+            // Inicializar Flatpickr
+            fpAdd = flatpickr("#add_purchase_date", flatpickrConfig);
+            fpEdit = flatpickr("#edit-purchase-date", flatpickrConfig);
+
+            // Restore filter states
+            const savedState = localStorage.getItem('showSignificantCompras');
+            if (savedState === 'true') {
+                document.getElementById('showSignificantCompras').checked = true;
+            } else {
+                document.getElementById('showSignificantCompras').checked = false;
+            }
+
+            const savedTicker = localStorage.getItem('tickerFilterCompras');
+            if (savedTicker) {
+                document.getElementById('tickerFilter').value = savedTicker;
+            }
+
+            filterInvestments();
+
+            // Filter event listeners
+            document.getElementById('showSignificantCompras').addEventListener('change', filterInvestments);
+            document.getElementById('tickerFilter').addEventListener('change', filterInvestments);
+
             // Inicializar el modal
             const modalEl = document.getElementById('edit-investment-modal');
             editModal = new Modal(modalEl);
@@ -252,9 +312,9 @@
                 const data = {
                     ticker_id: parseInt(document.getElementById('edit-ticker-id').value),
                     purchase_date: document.getElementById('edit-purchase-date').value,
-                    shares: parseFloat(document.getElementById('edit-shares').value),
-                    purchase_price: parseFloat(document.getElementById('edit-purchase-price').value),
-                    operation_cost: parseFloat(document.getElementById('edit-operation-cost').value) || 0
+                    shares: parseFloat(document.getElementById('edit-shares').value.replace(',', '.')),
+                    purchase_price: parseFloat(document.getElementById('edit-purchase-price').value.replace(',', '.')),
+                    operation_cost: parseFloat(document.getElementById('edit-operation-cost').value.replace(',', '.')) || 0
                 };
                 
                 try {
@@ -289,7 +349,24 @@
                     
                     document.getElementById('edit-investment-id').value = data.id;
                     document.getElementById('edit-ticker-id').value = data.ticker_id;
-                    document.getElementById('edit-purchase-date').value = data.purchase_date;
+                    // Actualizar Flatpickr
+                    let dateVal = data.purchase_date;
+                    // Intentar parsear si viene en formato custom "02 Jan 2006 15:04"
+                    const dateMatch = dateVal.match(/^(\d{2}) (\w{3}) (\d{4}) (\d{2}):(\d{2})$/);
+                    if (dateMatch) {
+                         const months = {'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'};
+                         const day = dateMatch[1];
+                         const month = months[dateMatch[2]] || '01';
+                         const year = dateMatch[3];
+                         const time = `${dateMatch[4]}:${dateMatch[5]}`;
+                         dateVal = `${year}-${month}-${day}T${time}`;
+                    }
+                    
+                    if (fpEdit) {
+                        fpEdit.setDate(dateVal);
+                    } else {
+                         document.getElementById('edit-purchase-date').value = dateVal;
+                    }
                     document.getElementById('edit-shares').value = data.shares;
                     document.getElementById('edit-purchase-price').value = data.purchase_price;
                     document.getElementById('edit-operation-cost').value = data.operation_cost;
@@ -308,6 +385,7 @@
             const row = document.getElementById(`investment-row-${id}`);
             if (row) {
                 row.querySelector('[data-field="ticker"]').textContent = data.ticker;
+                row.dataset.ticker = data.ticker; // Update attribute
                 row.querySelector('[data-field="purchase_date"]').textContent = data.purchase_date;
                 row.querySelector('[data-field="shares"]').textContent = data.shares.toFixed(6);
                 row.querySelector('[data-field="purchase_price"]').textContent = data.purchase_price.toFixed(3) + '€';
@@ -349,6 +427,10 @@
             const minutes = String(now.getMinutes()).padStart(2, '0');
             
             document.getElementById('add_purchase_date').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+            // Actualizar Flatpickr si existe
+            if (fpAdd) {
+                fpAdd.setDate(`${year}-${month}-${day}T${hours}:${minutes}`);
+            }
             
             // Show modal
             modal.classList.remove('hidden');
@@ -364,6 +446,42 @@
             modal.classList.remove('flex');
         }
         
+        function filterInvestments() {
+            const checkbox = document.getElementById('showSignificantCompras');
+            const tickerSelect = document.getElementById('tickerFilter');
+            
+            const significantActive = checkbox.checked;
+            const selectedTicker = tickerSelect.value;
+            
+            localStorage.setItem('showSignificantCompras', significantActive);
+            localStorage.setItem('tickerFilterCompras', selectedTicker);
+
+            const rows = document.querySelectorAll('#investmentsTableBody tr');
+            
+            rows.forEach(row => {
+                const currentShares = parseFloat(row.getAttribute('data-current-shares'));
+                const rowTicker = row.getAttribute('data-ticker');
+                
+                let showRow = true;
+
+                // Significant filter check
+                if (significantActive && (isNaN(currentShares) || currentShares <= 0.000001)) {
+                    showRow = false;
+                }
+
+                // Ticker filter check
+                if (selectedTicker && rowTicker !== selectedTicker) {
+                    showRow = false;
+                }
+
+                if (showRow) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
         // Close add modal when clicking outside of it
         document.addEventListener('click', function (event) {
             const addModal = document.getElementById('addInvestmentModal');

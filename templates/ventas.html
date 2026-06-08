@@ -4,10 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mis Ventas</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/static/img/favicon.png">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Flowbite CSS -->
     <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
+    <!-- Flatpickr CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link href="/static/css/common.css" rel="stylesheet">
 </head>
 
@@ -18,13 +22,31 @@
         <div class="p-4 mt-14">
 
         <!-- Botón para abrir modal de nueva venta -->
-        <div class="mb-8">
+        <div class="flex justify-between items-center mb-8">
             <button type="button" onclick="openAddSaleModal()" class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">
                 <svg class="w-5 h-5 me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                 </svg>
                 Registrar Nueva Venta
             </button>
+
+            <!-- Filters Container -->
+            <div class="flex items-center gap-4">
+                <!-- Ticker Filter -->
+                <select id="tickerFilter" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                    <option value="">Todos los Tickers</option>
+                    {{range .Tickers}}
+                    <option value="{{.Name}}">{{.Name}}</option>
+                    {{end}}
+                </select>
+
+                <!-- Toggle Filter -->
+                <label class="inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="showSignificantVentas" class="sr-only peer">
+                    <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                    <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Mostrar solo con > 0.000001 acciones</span>
+                </label>
+            </div>
         </div>
 
         <!-- Table -->
@@ -36,7 +58,6 @@
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Ticker</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Fecha</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Costo</th>
-                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Retención</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Acciones</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Precio Venta</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Monto Venta</th>
@@ -51,11 +72,10 @@
                 </thead>
                 <tbody>
                     {{range .Sales}}
-                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600" data-id="{{.ID}}">
+                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600" data-id="{{.ID}}" data-current-shares="{{index $.TickerShares .Ticker}}" data-ticker="{{.Ticker}}">
                         <th scope="row" class="px-6 py-4 font-bold text-gray-900 dark:text-white whitespace-nowrap" data-field="ticker" data-ticker-id="{{.TickerID}}">{{.Ticker}}</th>
                         <td class="px-6 py-4 whitespace-nowrap" data-field="sale_date">{{.SaleDate}}</td>
                         <td class="px-6 py-4" data-field="operation_cost">{{printf "%.2f€" .OperationCost}}</td>
-                        <td class="px-6 py-4" data-field="withheld_tax">{{printf "%.2f€" .WithheldTax}}</td>
                         <td class="px-6 py-4" data-field="shares">{{printf "%.6f" .Shares}}</td>
                         <td class="px-6 py-4" data-field="sale_price">{{printf "%.4f€" .SalePrice}}</td>
                         <td class="px-6 py-4" data-field="total_sale_value">{{printf "%.2f€" .TotalSaleValue}}</td>
@@ -74,7 +94,15 @@
                             <div id="dropdownSale-{{.ID}}" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 dark:divide-gray-600">
                                 <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownSaleButton-{{.ID}}">
                                     <li>
-                                        <button type="button" onclick="openEditModal({{.ID}}, '{{.Ticker}}', {{.TickerID}}, '{{.SaleDate}}', {{.Shares}}, {{.SalePrice}}, {{.OperationCost}}, {{.WithheldTax}})" class="flex w-full items-center px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+                                        <button type="button" 
+                                            class="edit-sale-btn flex w-full items-center px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+                                            data-sale-id="{{.ID}}"
+                                            data-ticker="{{.Ticker}}"
+                                            data-ticker-id="{{.TickerID}}"
+                                            data-sale-date="{{.SaleDate}}"
+                                            data-shares="{{.Shares}}"
+                                            data-sale-price="{{.SalePrice}}"
+                                            data-operation-cost="{{.OperationCost}}">
                                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/>
                                             </svg>
@@ -143,7 +171,7 @@
                             <!-- Fecha Venta -->
                             <div>
                                 <label for="edit_sale_date" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Fecha y Hora</label>
-                                <input type="datetime-local" name="sale_date" id="edit_sale_date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                                <input type="text" name="sale_date" id="edit_sale_date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                             </div>
                         </div>
                         
@@ -151,13 +179,13 @@
                             <!-- Acciones -->
                             <div>
                                 <label for="edit_shares" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Acciones</label>
-                                <input type="number" step="any" name="shares" id="edit_shares" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                                <input type="number" step="any" name="shares" id="edit_shares" autocomplete="off" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                             </div>
                             
                             <!-- Precio Venta -->
                             <div>
                                 <label for="edit_sale_price" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Precio Venta</label>
-                                <input type="number" step="any" name="sale_price" id="edit_sale_price" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                                <input type="number" step="any" name="sale_price" id="edit_sale_price" autocomplete="off" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                             </div>
                         </div>
                         
@@ -165,13 +193,7 @@
                             <!-- Costo Operación -->
                             <div>
                                 <label for="edit_operation_cost" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Costo Operación</label>
-                                <input type="number" step="any" name="operation_cost" id="edit_operation_cost" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
-                            </div>
-                            
-                            <!-- Impuesto Retenido -->
-                            <div>
-                                <label for="edit_withheld_tax" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Impuesto Retenido</label>
-                                <input type="number" step="any" name="withheld_tax" id="edit_withheld_tax" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                                <input type="number" step="any" name="operation_cost" id="edit_operation_cost" autocomplete="off" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
                             </div>
                         </div>
                     </div>
@@ -222,7 +244,7 @@
                             <!-- Fecha Venta -->
                             <div>
                                 <label for="add_sale_date" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Fecha y Hora</label>
-                                <input type="datetime-local" name="sale_date" id="add_sale_date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                                <input type="text" name="sale_date" id="add_sale_date" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                             </div>
                         </div>
                         
@@ -230,13 +252,13 @@
                             <!-- Acciones -->
                             <div>
                                 <label for="add_shares" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Acciones</label>
-                                <input type="number" step="any" name="shares" id="add_shares" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                                <input type="number" step="any" name="shares" id="add_shares" autocomplete="off" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                             </div>
                             
                             <!-- Precio Venta -->
                             <div>
                                 <label for="add_sale_price" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Precio Venta</label>
-                                <input type="number" step="any" name="sale_price" id="add_sale_price" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                                <input type="number" step="any" name="sale_price" id="add_sale_price" autocomplete="off" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                             </div>
                         </div>
                         
@@ -244,14 +266,9 @@
                             <!-- Costo Operación -->
                             <div>
                                 <label for="add_operation_cost" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Costo Operación</label>
-                                <input type="number" step="any" name="operation_cost" id="add_operation_cost" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                                <input type="number" step="any" name="operation_cost" id="add_operation_cost" autocomplete="off" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
                             </div>
                             
-                            <!-- Impuesto Retenido -->
-                            <div>
-                                <label for="add_withheld_tax" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Impuesto Retenido</label>
-                                <input type="number" step="any" name="withheld_tax" id="add_withheld_tax" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
-                            </div>
                         </div>
                     </div>
                     <!-- Modal footer -->
@@ -268,8 +285,69 @@
 
     <!-- Flowbite JS -->
     <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+    <!-- Flatpickr JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/de.js"></script>
     <script src="/static/js/table-sort.js"></script>
-    <script src="/static/js/ventas.js?v=3"></script>
+    <script src="/static/js/ventas.js?v=5"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Restore filter states
+            const savedState = localStorage.getItem('showSignificantVentas');
+            if (savedState === 'true') {
+                document.getElementById('showSignificantVentas').checked = true;
+            } else {
+                document.getElementById('showSignificantVentas').checked = false;
+            }
+
+            const savedTicker = localStorage.getItem('tickerFilterVentas');
+            if (savedTicker) {
+                document.getElementById('tickerFilter').value = savedTicker;
+            }
+
+            filterSales();
+
+            // Filter event listeners
+            document.getElementById('showSignificantVentas').addEventListener('change', filterSales);
+            document.getElementById('tickerFilter').addEventListener('change', filterSales);
+        });
+
+        function filterSales() {
+            const checkbox = document.getElementById('showSignificantVentas');
+            const tickerSelect = document.getElementById('tickerFilter');
+            
+            const significantActive = checkbox.checked;
+            const selectedTicker = tickerSelect.value;
+            
+            localStorage.setItem('showSignificantVentas', significantActive);
+            localStorage.setItem('tickerFilterVentas', selectedTicker);
+
+            const rows = document.querySelectorAll('#salesTable tbody tr');
+            
+            rows.forEach(row => {
+                const currentShares = parseFloat(row.getAttribute('data-current-shares'));
+                const rowTicker = row.getAttribute('data-ticker');
+                
+                let showRow = true;
+
+                // Significant filter check
+                if (significantActive && (isNaN(currentShares) || currentShares <= 0.000001)) {
+                    showRow = false;
+                }
+
+                // Ticker filter check
+                if (selectedTicker && rowTicker !== selectedTicker) {
+                    showRow = false;
+                }
+
+                if (showRow) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+    </script>
 
 </body>
 

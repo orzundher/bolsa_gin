@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -25,11 +28,22 @@ type Migration struct {
 	AppliedAt time.Time
 }
 
+// TickerGroup representa un grupo de tickers (ej: Tech, Finance, etc.)
+type TickerGroup struct {
+	gorm.Model
+	Name string `gorm:"uniqueIndex;not null"`
+}
+
 // Ticker representa un símbolo bursátil con su precio actual.
 type Ticker struct {
 	gorm.Model
-	Name         string `gorm:"uniqueIndex"`
-	CurrentPrice float64
+	Name               string `gorm:"uniqueIndex"`
+	CurrentPrice       float64
+	YahooFinanceTicker string
+	YahooEur           bool
+	Active             bool        `gorm:"default:true"`
+	GroupID            *uint       // Nullable foreign key
+	Group              TickerGroup `gorm:"foreignKey:GroupID"`
 }
 
 // Investment representa una única compra de acciones en la BD.
@@ -52,7 +66,6 @@ type Sale struct {
 	Shares        float64
 	SalePrice     float64
 	OperationCost float64
-	WithheldTax   float64
 }
 
 // PriceHistory representa un snapshot histórico de precio de un ticker.
@@ -64,16 +77,44 @@ type PriceHistory struct {
 	Price      float64
 }
 
+// Dividend representa un cobro de dividendo de un ticker.
+type Dividend struct {
+	gorm.Model
+	TickerID uint
+	Ticker   Ticker `gorm:"foreignKey:TickerID"`
+	Date     time.Time
+	Amount   float64 // Importe total recibido
+	Notes    string
+}
+
+// DividendView representa los datos de dividendo para mostrar en la UI.
+type DividendView struct {
+	ID       uint
+	TickerID uint
+	Ticker   string
+	Date     string
+	Amount   float64
+	Notes    string
+}
+
 // --- VISTAS ---
 
 // TickerView representa los datos de un ticker para mostrar en la UI.
 type TickerView struct {
-	ID                uint
-	Name              string
-	CurrentPrice      float64
-	UpdatedAt         string
-	SnapshotChange    float64 // Cambio porcentual entre los últimos 2 snapshots
-	HasSnapshotChange bool    // Indica si hay datos suficientes para mostrar el cambio
+	ID                      uint
+	Name                    string
+	CurrentPrice            float64
+	UpdatedAt               string
+	SnapshotChange          float64 // Cambio porcentual entre los últimos 2 snapshots
+	HasSnapshotChange       bool    // Indica si hay datos suficientes para mostrar el cambio
+	YahooFinanceTicker      string
+	YahooEur                bool
+	HasShares               bool
+	GroupName               string
+	GroupID                 uint
+	Active                  bool
+	CurrentToSnapshotPct    float64 // Cambio porcentual entre precio actual y último snapshot
+	HasCurrentToSnapshotPct bool    // Indica si hay datos para mostrar el cambio actual vs snapshot
 }
 
 // InvestmentView representa los datos de inversión que se mostrarán en la página.
@@ -102,6 +143,12 @@ type TickerSummaryView struct {
 	CurrentValue      float64
 	ProfitLoss        float64
 	Performance       float64
+	SalesProfit       float64
+	WeightPercentage  float64
+	SnapshotChange    float64 // Cambio porcentual entre los últimos 2 snapshots
+	HasSnapshotChange bool    // Indica si hay datos suficientes para mostrar el cambio
+	GroupName         string
+	Dividends         float64 // Total de dividendos cobrados para este ticker
 }
 
 // SaleView representa los datos de venta que se mostrarán en la página.
@@ -113,7 +160,6 @@ type SaleView struct {
 	Shares          float64
 	SalePrice       float64
 	OperationCost   float64
-	WithheldTax     float64
 	TotalSaleValue  float64
 	CurrentPrice    float64
 	CurrentValue    float64
@@ -128,12 +174,14 @@ type SaleView struct {
 var db *gorm.DB
 
 func main() {
+
 	// Cargar variables de entorno desde .env
 	if err := godotenv.Load(); err != nil {
 		log.Println("No se encontró archivo .env, usando variables de entorno del sistema")
 	}
 
 	var err error
+
 	// Configurar la base de datos con GORM
 	db, err = setupDatabase()
 	if err != nil {
@@ -142,12 +190,13 @@ func main() {
 
 	// Configurar Gin
 	router := gin.Default()
+
 	router.LoadHTMLGlob("templates/*")
 	router.Static("/static", "./static")
 
 	// Ruta principal para mostrar los datos
 	router.GET("/", func(c *gin.Context) {
-		investments, summaries, sales, totalCapital, netProfitLoss, totalOperationCost, _, portfolioPerformance, portfolioUtility, numPositions, err := getInvestmentData()
+		investments, summaries, sales, totalCapital, netProfitLoss, totalOperationCost, _, portfolioPerformance, portfolioUtility, numPositions, totalCurrentValue, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
@@ -159,8 +208,20 @@ func main() {
 			totalSaleUtility += s.SaleUtility
 		}
 
-		// Calcular Valor de Salida: Utilidad Ventas + Utilidad Cartera - Costos de Operación - Número de Posiciones
-		exitValue := totalSaleUtility + portfolioUtility - totalOperationCost - float64(numPositions)
+		// Calcular total de dividendos
+		var dividends []Dividend
+		db.Find(&dividends)
+		totalDividends := 0.0
+		for _, d := range dividends {
+			totalDividends += d.Amount
+		}
+
+		// Calcular Valor de Salida: Utilidad Ventas + Utilidad Cartera + Dividendos - Costos de Operación - Número de Posiciones
+		exitValue := totalSaleUtility + portfolioUtility + totalDividends - totalOperationCost - float64(numPositions)
+
+		// Obtener notas
+		var notes []Note
+		db.Order("date desc").Find(&notes)
 
 		c.HTML(http.StatusOK, "index.html", gin.H{
 			"Investments":          investments,
@@ -171,78 +232,283 @@ func main() {
 			"TotalSaleUtility":     totalSaleUtility,
 			"PortfolioPerformance": portfolioPerformance,
 			"PortfolioUtility":     portfolioUtility,
+			"TotalCurrentValue":    totalCurrentValue,
 			"NumPositions":         numPositions,
 			"ExitValue":            exitValue,
+			"TotalDividends":       totalDividends,
+			"Notes":                notes,
 			"ActivePage":           "home",
+		})
+	})
+
+	// Rutas para notas
+	router.POST("/api/notes", func(c *gin.Context) {
+		var input struct {
+			Date    string `json:"date"`
+			Content string `json:"content"`
+		}
+
+		if err := c.BindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		date, err := time.ParseInLocation("2006-01-02", input.Date, time.Local)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Formato de fecha inválido"})
+			return
+		}
+
+		note := Note{Date: date, Content: input.Content}
+		if err := db.Create(&note).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al guardar la nota"})
+			return
+		}
+
+		c.JSON(http.StatusOK, note)
+	})
+
+	router.PUT("/api/notes/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		var input struct {
+			Date    string `json:"date"`
+			Content string `json:"content"`
+		}
+
+		if err := c.BindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var note Note
+		if err := db.First(&note, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Nota no encontrada"})
+			return
+		}
+
+		date, err := time.ParseInLocation("2006-01-02", input.Date, time.Local)
+		if err == nil {
+			date = date.UTC()
+		}
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Formato de fecha inválido"})
+			return
+		}
+
+		note.Date = date
+		note.Content = input.Content
+		db.Save(&note)
+
+		c.JSON(http.StatusOK, note)
+	})
+
+	router.DELETE("/api/notes/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		if err := db.Delete(&Note{}, id).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar la nota"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true})
+	})
+
+	// Rutas para notas de tickers
+	router.POST("/api/ticker-notes", func(c *gin.Context) {
+		var input struct {
+			TickerID uint   `json:"ticker_id"`
+			Date     string `json:"date"`
+			Content  string `json:"content"`
+		}
+
+		if err := c.BindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		date, err := time.ParseInLocation("2006-01-02", input.Date, time.Local)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Formato de fecha inválido"})
+			return
+		}
+
+		note := TickerNote{TickerID: input.TickerID, Date: date, Content: input.Content}
+		if err := db.Create(&note).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al guardar la nota del ticker"})
+			return
+		}
+
+		c.JSON(http.StatusOK, note)
+	})
+
+	router.PUT("/api/ticker-notes/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		var input struct {
+			Date    string `json:"date"`
+			Content string `json:"content"`
+		}
+
+		if err := c.BindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var note TickerNote
+		if err := db.First(&note, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Nota del ticker no encontrada"})
+			return
+		}
+
+		date, err := time.ParseInLocation("2006-01-02", input.Date, time.Local)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Formato de fecha inválido"})
+			return
+		}
+
+		note.Date = date
+		note.Content = input.Content
+		db.Save(&note)
+
+		c.JSON(http.StatusOK, note)
+	})
+
+	router.DELETE("/api/ticker-notes/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		if err := db.Delete(&TickerNote{}, id).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar la nota del ticker"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true})
+	})
+
+	// Proxy: Obtener precio actual desde el servicio externo (evita CORS)
+	router.GET("/api/fetch-price/:yahoo_ticker", func(c *gin.Context) {
+		yahooTicker := c.Param("yahoo_ticker")
+		resp, err := http.Get(fmt.Sprintf("http://localhost:3010/precio/%s", yahooTicker))
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "No se puede conectar con el servicio de precios"})
+			return
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al leer la respuesta del servicio de precios"})
+			return
+		}
+
+		c.Data(resp.StatusCode, "application/json", body)
+	})
+
+	// API: Obtener historial de utilidad de ventas (basado en eventos reales, no snapshots)
+	router.GET("/api/sales-utility-history", func(c *gin.Context) {
+		// Obtener todas las inversiones y ventas
+		var allInvestments []Investment
+		db.Order("purchase_date asc").Find(&allInvestments)
+
+		var allSales []Sale
+		db.Order("sale_date asc").Find(&allSales)
+
+		if len(allSales) == 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"dates":     []string{},
+				"utilities": []float64{},
+			})
+			return
+		}
+
+		// Combinar todos los eventos financieros en una lista cronológica
+		type Event struct {
+			Date   time.Time
+			Type   string // "buy", "sell"
+			Ticker uint
+			Shares float64
+			Price  float64
+		}
+		var allEvents []Event
+		for _, inv := range allInvestments {
+			allEvents = append(allEvents, Event{Date: inv.PurchaseDate, Type: "buy", Ticker: inv.TickerID, Shares: inv.Shares, Price: inv.PurchasePrice})
+		}
+		for _, sale := range allSales {
+			allEvents = append(allEvents, Event{Date: sale.SaleDate, Type: "sell", Ticker: sale.TickerID, Shares: sale.Shares, Price: sale.SalePrice})
+		}
+		sort.Slice(allEvents, func(i, j int) bool {
+			if allEvents[i].Date.Equal(allEvents[j].Date) {
+				return allEvents[i].Type == "buy" // Compras antes que ventas si coinciden
+			}
+			return allEvents[i].Date.Before(allEvents[j].Date)
+		})
+
+		// Mapa para seguir el estado de cada ticker
+		type TickerState struct {
+			Shares  float64
+			Capital float64
+		}
+		tickerStates := make(map[uint]TickerState)
+
+		var dates []string
+		var utilities []float64
+
+		totalSalesUtility := 0.0
+
+		// Agregar punto inicial en 0 justo antes del primer evento
+		if len(allEvents) > 0 {
+			dates = append(dates, allEvents[0].Date.Add(-1*time.Second).Format("02 Jan 2006 15:04:05"))
+			utilities = append(utilities, 0.0)
+		}
+
+		for _, e := range allEvents {
+			state := tickerStates[e.Ticker]
+
+			if e.Type == "buy" {
+				state.Shares += e.Shares
+				state.Capital += e.Shares * e.Price
+				tickerStates[e.Ticker] = state
+			} else if e.Type == "sell" {
+				wac := 0.0
+				if state.Shares > 0 {
+					wac = state.Capital / state.Shares
+				}
+				// Utilidad realizada: (Precio Venta - WAC) * Acciones Vendidas
+				saleUtility := (e.Price - wac) * e.Shares
+				totalSalesUtility += saleUtility
+
+				// Reducir capital proporcionalmente
+				state.Capital -= e.Shares * wac
+				state.Shares -= e.Shares
+				tickerStates[e.Ticker] = state
+
+				// Registrar punto en el gráfico para cada venta (cambio de utilidad)
+				dates = append(dates, e.Date.Format("02 Jan 2006 15:04:05"))
+				utilities = append(utilities, totalSalesUtility)
+			}
+		}
+
+		// Agregar punto final "AHORA" para extender la línea hasta el presente
+		now := time.Now()
+		if len(dates) > 0 {
+			lastDateStr := dates[len(dates)-1]
+			lastDate, _ := time.Parse("02 Jan 2006 15:04:05", lastDateStr) // Formato interno usado arriba
+
+			if lastDate.Before(now) {
+				dates = append(dates, now.Local().Format("02 Jan 2006 15:04:05"))
+				utilities = append(utilities, totalSalesUtility)
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"dates":     dates,
+			"utilities": utilities,
 		})
 	})
 
 	// Ruta para mostrar la página de resumen
 	router.GET("/resumen", func(c *gin.Context) {
-		_, summaries, _, _, _, _, _, _, _, _, err := getInvestmentData()
+		_, summaries, _, _, _, _, _, _, _, _, _, err := getInvestmentData()
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
 			return
 		}
 
-		c.HTML(http.StatusOK, "resumen.html", gin.H{
-			"Summaries":  summaries,
-			"ActivePage": "resumen",
-		})
-	})
-
-	// Ruta para mostrar la página de compras
-	router.GET("/compras", func(c *gin.Context) {
-		investments, _, _, _, _, _, _, _, _, _, err := getInvestmentData()
-		if err != nil {
-			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
-			return
-		}
-
-		// Obtener todos los tickers disponibles
-		var tickers []Ticker
-		db.Order("name").Find(&tickers)
-		var tickerViews []TickerView
-		for _, t := range tickers {
-			tickerViews = append(tickerViews, TickerView{ID: t.ID, Name: t.Name, CurrentPrice: t.CurrentPrice})
-		}
-
-		c.HTML(http.StatusOK, "compras.html", gin.H{
-			"Investments": investments,
-			"Tickers":     tickerViews,
-			"ActivePage":  "compras",
-		})
-	})
-
-	// Ruta para mostrar la página de ventas
-	router.GET("/ventas", func(c *gin.Context) {
-		_, _, sales, _, _, _, _, _, _, _, err := getInvestmentData()
-		if err != nil {
-			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
-			return
-		}
-
-		// Obtener todos los tickers disponibles
-		var tickers []Ticker
-		db.Order("name").Find(&tickers)
-		var tickerViews []TickerView
-		for _, t := range tickers {
-			tickerViews = append(tickerViews, TickerView{ID: t.ID, Name: t.Name, CurrentPrice: t.CurrentPrice})
-		}
-
-		c.HTML(http.StatusOK, "ventas.html", gin.H{
-			"Sales":      sales,
-			"Tickers":    tickerViews,
-			"ActivePage": "ventas",
-		})
-	})
-
-	// Ruta para mostrar la página de precios
-	router.GET("/precios", func(c *gin.Context) {
-		var tickers []Ticker
-		db.Order("name").Find(&tickers)
-
-		// Obtener los dos últimos snapshots
+		// Obtener los dos últimos snapshots para calcular cambios
 		type SnapshotInfo struct {
 			SnapshotID string
 			CreatedAt  time.Time
@@ -288,6 +554,369 @@ func main() {
 			}
 		}
 
+		// Agregar información de cambios de snapshot a los summaries
+		for i := range summaries {
+			if changePtr, exists := snapshotChanges[summaries[i].TickerID]; exists {
+				summaries[i].SnapshotChange = *changePtr
+				summaries[i].HasSnapshotChange = true
+			}
+		}
+
+		// Calcular dividendos por ticker
+		type DividendSum struct {
+			TickerID uint
+			Total    float64
+		}
+		var divSums []DividendSum
+		db.Model(&Dividend{}).Select("ticker_id, SUM(amount) as total").Group("ticker_id").Scan(&divSums)
+		divMap := make(map[uint]float64)
+		for _, d := range divSums {
+			divMap[d.TickerID] = d.Total
+		}
+		for i := range summaries {
+			summaries[i].Dividends = divMap[summaries[i].TickerID]
+		}
+
+		c.HTML(http.StatusOK, "resumen.html", gin.H{
+			"Summaries":  summaries,
+			"ActivePage": "resumen",
+		})
+	})
+
+	// Ruta para exportar la tabla resumen a TOML
+	router.GET("/export-resumen-toml", func(c *gin.Context) {
+		_, summaries, _, _, _, _, _, _, _, _, _, err := getInvestmentData()
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
+			return
+		}
+
+		var b strings.Builder
+		b.WriteString("# Resumen de Inversiones\n")
+		b.WriteString(fmt.Sprintf("# Fecha de exportación: %s\n", time.Now().Local().Format("2006-01-02 15:04:05")))
+		b.WriteString("currency = \"EUR\"\n\n")
+
+		for _, s := range summaries {
+			// Solo exportar si hay acciones actualmente
+			if s.TotalShares > 0 {
+				b.WriteString("[[tickers]]\n")
+				b.WriteString(fmt.Sprintf("symbol = \"%s\"\n", s.Ticker))
+				b.WriteString(fmt.Sprintf("shares = %.6f\n", s.TotalShares))
+				b.WriteString(fmt.Sprintf("invested = %.2f\n", s.CurrentInvestment))
+				b.WriteString(fmt.Sprintf("cost = %.2f\n", s.TotalCost))
+				b.WriteString(fmt.Sprintf("value = %.2f\n", s.CurrentValue))
+				b.WriteString(fmt.Sprintf("profit_loss = %.2f\n", s.ProfitLoss))
+				b.WriteString(fmt.Sprintf("performance = %.2f\n", s.Performance))
+				b.WriteString(fmt.Sprintf("sales_profit = %.2f\n", s.SalesProfit))
+				b.WriteString(fmt.Sprintf("weight = %.2f\n", s.WeightPercentage))
+				if s.GroupName != "" {
+					b.WriteString(fmt.Sprintf("group = \"%s\"\n", s.GroupName))
+				}
+				b.WriteString("\n")
+			}
+		}
+
+		// Configurar headers para descarga
+		filename := fmt.Sprintf("resumen_inversiones_%s.toml", time.Now().Format("20060102"))
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+		c.Header("Content-Type", "application/toml")
+		c.String(http.StatusOK, b.String())
+	})
+
+	// Ruta para mostrar la página de compras
+	router.GET("/compras", func(c *gin.Context) {
+		investments, summaries, _, _, _, _, _, _, _, _, _, err := getInvestmentData()
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
+			return
+		}
+
+		// Crear mapa de acciones actuales por ticker
+		tickerShares := make(map[string]float64)
+		for _, s := range summaries {
+			tickerShares[s.Ticker] = s.TotalShares
+		}
+
+		// Obtener todos los tickers disponibles
+		var tickers []Ticker
+		db.Order("name").Find(&tickers)
+		var tickerViews []TickerView
+		for _, t := range tickers {
+			tickerViews = append(tickerViews, TickerView{ID: t.ID, Name: t.Name, CurrentPrice: t.CurrentPrice})
+		}
+
+		c.HTML(http.StatusOK, "compras.html", gin.H{
+			"Investments":  investments,
+			"Tickers":      tickerViews,
+			"TickerShares": tickerShares,
+			"ActivePage":   "compras",
+		})
+	})
+
+	// Ruta para mostrar la página de ventas
+	router.GET("/ventas", func(c *gin.Context) {
+		_, summaries, sales, _, _, _, _, _, _, _, _, err := getInvestmentData()
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
+			return
+		}
+
+		// Crear mapa de acciones actuales por ticker
+		tickerShares := make(map[string]float64)
+		for _, s := range summaries {
+			tickerShares[s.Ticker] = s.TotalShares
+		}
+
+		// Obtener todos los tickers disponibles
+		var tickers []Ticker
+		db.Order("name").Find(&tickers)
+		var tickerViews []TickerView
+		for _, t := range tickers {
+			tickerViews = append(tickerViews, TickerView{ID: t.ID, Name: t.Name, CurrentPrice: t.CurrentPrice})
+		}
+
+		c.HTML(http.StatusOK, "ventas.html", gin.H{
+			"Sales":        sales,
+			"Tickers":      tickerViews,
+			"TickerShares": tickerShares,
+			"ActivePage":   "ventas",
+		})
+	})
+
+	// Ruta para mostrar la página de dividendos
+	router.GET("/dividendos", func(c *gin.Context) {
+		var dividends []Dividend
+		db.Preload("Ticker").Order("date desc").Find(&dividends)
+
+		var dividendViews []DividendView
+		totalDividends := 0.0
+		for _, d := range dividends {
+			dividendViews = append(dividendViews, DividendView{
+				ID:       d.ID,
+				TickerID: d.TickerID,
+				Ticker:   d.Ticker.Name,
+				Date:     d.Date.Local().Format("02 Jan 2006"),
+				Amount:   d.Amount,
+				Notes:    d.Notes,
+			})
+			totalDividends += d.Amount
+		}
+
+		var tickers []Ticker
+		db.Order("name").Find(&tickers)
+		var tickerViews []TickerView
+		for _, t := range tickers {
+			tickerViews = append(tickerViews, TickerView{ID: t.ID, Name: t.Name})
+		}
+
+		c.HTML(http.StatusOK, "dividendos.html", gin.H{
+			"Dividends":      dividendViews,
+			"TotalDividends": totalDividends,
+			"Tickers":        tickerViews,
+			"ActivePage":     "dividendos",
+		})
+	})
+
+	// API: Registrar un nuevo dividendo
+	router.POST("/api/dividend", func(c *gin.Context) {
+		var input struct {
+			TickerID uint    `json:"ticker_id"`
+			Date     string  `json:"date"`
+			Amount   float64 `json:"amount"`
+			Notes    string  `json:"notes"`
+		}
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos"})
+			return
+		}
+
+		date, err := time.ParseInLocation("2006-01-02", input.Date, time.Local)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Formato de fecha inválido"})
+			return
+		}
+
+		dividend := Dividend{
+			TickerID: input.TickerID,
+			Date:     date.UTC(),
+			Amount:   input.Amount,
+			Notes:    input.Notes,
+		}
+		if err := db.Create(&dividend).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al guardar el dividendo"})
+			return
+		}
+
+		var ticker Ticker
+		db.First(&ticker, input.TickerID)
+
+		c.JSON(http.StatusOK, gin.H{
+			"id":        dividend.ID,
+			"ticker_id": dividend.TickerID,
+			"ticker":    ticker.Name,
+			"date":      dividend.Date.Local().Format("02 Jan 2006"),
+			"amount":    dividend.Amount,
+			"notes":     dividend.Notes,
+		})
+	})
+
+	// API: Obtener datos de un dividendo
+	router.GET("/api/dividend/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+			return
+		}
+
+		var dividend Dividend
+		if err := db.Preload("Ticker").First(&dividend, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Dividendo no encontrado"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"id":        dividend.ID,
+			"ticker_id": dividend.TickerID,
+			"ticker":    dividend.Ticker.Name,
+			"date":      dividend.Date.Local().Format("2006-01-02"),
+			"amount":    dividend.Amount,
+			"notes":     dividend.Notes,
+		})
+	})
+
+	// API: Actualizar un dividendo
+	router.PUT("/api/dividend/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+			return
+		}
+
+		var dividend Dividend
+		if err := db.First(&dividend, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Dividendo no encontrado"})
+			return
+		}
+
+		var input struct {
+			TickerID uint    `json:"ticker_id"`
+			Date     string  `json:"date"`
+			Amount   float64 `json:"amount"`
+			Notes    string  `json:"notes"`
+		}
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos"})
+			return
+		}
+
+		date, err := time.ParseInLocation("2006-01-02", input.Date, time.Local)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Formato de fecha inválido"})
+			return
+		}
+
+		db.Model(&dividend).Updates(map[string]interface{}{
+			"ticker_id": input.TickerID,
+			"date":      date.UTC(),
+			"amount":    input.Amount,
+			"notes":     input.Notes,
+		})
+
+		var ticker Ticker
+		db.First(&ticker, input.TickerID)
+
+		c.JSON(http.StatusOK, gin.H{
+			"id":        id,
+			"ticker_id": input.TickerID,
+			"ticker":    ticker.Name,
+			"date":      date.Local().Format("02 Jan 2006"),
+			"amount":    input.Amount,
+			"notes":     input.Notes,
+		})
+	})
+
+	// API: Eliminar un dividendo
+	router.DELETE("/api/dividend/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+			return
+		}
+		if err := db.Delete(&Dividend{}, id).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar el dividendo"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true})
+	})
+
+	// Ruta para mostrar la página de precios
+	router.GET("/precios", func(c *gin.Context) {
+		var tickers []Ticker
+		db.Preload("Group").Order("name").Find(&tickers)
+
+		var groups []TickerGroup
+		db.Order("name").Find(&groups)
+
+		// Obtener los dos últimos snapshots
+		type SnapshotInfo struct {
+			SnapshotID string
+			CreatedAt  time.Time
+		}
+		var snapshots []SnapshotInfo
+		db.Model(&PriceHistory{}).
+			Select("DISTINCT snapshot_id, MIN(created_at) as created_at").
+			Group("snapshot_id").
+			Order("created_at DESC").
+			Limit(2).
+			Scan(&snapshots)
+
+		// Crear un mapa para almacenar los cambios porcentuales por ticker
+		snapshotChanges := make(map[uint]*float64)
+
+		// Si hay al menos 2 snapshots, calcular los cambios
+		// Mapas para precios de snapshots
+		lastPriceMap := make(map[uint]float64)
+
+		// Si hay al menos 1 snapshot, cargarlo para comparar con actual
+		if len(snapshots) >= 1 {
+			lastSnapshotID := snapshots[0].SnapshotID
+			var lastPrices []PriceHistory
+			db.Where("snapshot_id = ?", lastSnapshotID).Find(&lastPrices)
+			for _, p := range lastPrices {
+				lastPriceMap[p.TickerID] = p.Price
+			}
+		}
+
+		// Si hay al menos 2 snapshots, calcular cambios entre snapshots (SnapshotChange)
+		if len(snapshots) >= 2 {
+			prevSnapshotID := snapshots[1].SnapshotID
+			var prevPrices []PriceHistory
+			db.Where("snapshot_id = ?", prevSnapshotID).Find(&prevPrices)
+
+			prevPriceMap := make(map[uint]float64)
+			for _, p := range prevPrices {
+				prevPriceMap[p.TickerID] = p.Price
+			}
+
+			// Calcular cambios porcentuales entre snapshots
+			for tickerID, lastPrice := range lastPriceMap {
+				if prevPrice, exists := prevPriceMap[tickerID]; exists && prevPrice > 0 {
+					change := ((lastPrice - prevPrice) / prevPrice) * 100
+					snapshotChanges[tickerID] = &change
+				}
+			}
+		}
+
+		// Obtener datos de inversión para saber si tenemos acciones
+		_, summaries, _, _, _, _, _, _, _, _, _, _ := getInvestmentData()
+		sharesMap := make(map[uint]float64)
+		for _, s := range summaries {
+			sharesMap[s.TickerID] = s.TotalShares
+		}
+
 		var tickerViews []TickerView
 		for _, t := range tickers {
 			changePtr := snapshotChanges[t.ID]
@@ -297,18 +926,40 @@ func main() {
 				changeVal = *changePtr
 			}
 
+			gid := uint(0)
+			if t.GroupID != nil {
+				gid = *t.GroupID
+			}
+
+			// Calcular cambio vs último snapshot
+			currentToSnapshotPct := 0.0
+			hasCurrentToSnapshotPct := false
+			if lastSnapPrice, ok := lastPriceMap[t.ID]; ok && lastSnapPrice > 0 {
+				currentToSnapshotPct = ((t.CurrentPrice - lastSnapPrice) / lastSnapPrice) * 100
+				hasCurrentToSnapshotPct = true
+			}
+
 			tickerViews = append(tickerViews, TickerView{
-				ID:                t.ID,
-				Name:              t.Name,
-				CurrentPrice:      t.CurrentPrice,
-				UpdatedAt:         t.UpdatedAt.Format("02 Jan 2006 15:04"),
-				SnapshotChange:    changeVal,
-				HasSnapshotChange: hasChange,
+				ID:                      t.ID,
+				Name:                    t.Name,
+				CurrentPrice:            t.CurrentPrice,
+				UpdatedAt:               t.UpdatedAt.Local().Format("02 Jan 2006 15:04"),
+				SnapshotChange:          changeVal,
+				HasSnapshotChange:       hasChange,
+				YahooFinanceTicker:      t.YahooFinanceTicker,
+				YahooEur:                t.YahooEur,
+				HasShares:               sharesMap[t.ID] > 0.000001,
+				GroupName:               t.Group.Name,
+				GroupID:                 gid,
+				Active:                  t.Active,
+				CurrentToSnapshotPct:    currentToSnapshotPct,
+				HasCurrentToSnapshotPct: hasCurrentToSnapshotPct,
 			})
 		}
 
 		c.HTML(http.StatusOK, "precios.html", gin.H{
 			"Tickers":    tickerViews,
+			"Groups":     groups,
 			"ActivePage": "precios",
 		})
 	})
@@ -329,8 +980,72 @@ func main() {
 			Order("created_at DESC").
 			Scan(&snapshots)
 
+		// --- Calculation for Top Gainers/Losers ---
+		type TickerPerf struct {
+			Ticker     string
+			FirstDate  time.Time
+			LastDate   time.Time
+			FirstPrice float64
+			LastPrice  float64
+			AbsChange  float64
+			PctChange  float64
+		}
+
+		var allHistory []PriceHistory
+		db.Preload("Ticker").Order("created_at asc").Find(&allHistory)
+
+		perfMap := make(map[uint]*TickerPerf)
+
+		for _, h := range allHistory {
+			if _, exists := perfMap[h.TickerID]; !exists {
+				perfMap[h.TickerID] = &TickerPerf{
+					Ticker:     h.Ticker.Name,
+					FirstDate:  h.CreatedAt,
+					FirstPrice: h.Price,
+				}
+			}
+			// Update last entry (since we are iterating in ASC order)
+			perfMap[h.TickerID].LastDate = h.CreatedAt
+			perfMap[h.TickerID].LastPrice = h.Price
+		}
+
+		var perfs []*TickerPerf
+		for _, p := range perfMap {
+			p.AbsChange = p.LastPrice - p.FirstPrice
+			if p.FirstPrice != 0 {
+				p.PctChange = (p.AbsChange / p.FirstPrice) * 100
+			}
+			perfs = append(perfs, p)
+		}
+
+		// Sort for Gainers (Highest PctChange)
+		sort.Slice(perfs, func(i, j int) bool {
+			return perfs[i].PctChange > perfs[j].PctChange
+		})
+
+		var topGainers []*TickerPerf
+		for i := 0; i < len(perfs) && i < 10; i++ {
+			if perfs[i].PctChange > 0 {
+				topGainers = append(topGainers, perfs[i])
+			}
+		}
+
+		// Sort for Losers (Lowest PctChange - most negative)
+		sort.Slice(perfs, func(i, j int) bool {
+			return perfs[i].PctChange < perfs[j].PctChange
+		})
+
+		var topLosers []*TickerPerf
+		for i := 0; i < len(perfs) && i < 10; i++ {
+			if perfs[i].PctChange < 0 {
+				topLosers = append(topLosers, perfs[i])
+			}
+		}
+
 		c.HTML(http.StatusOK, "snapshots.html", gin.H{
 			"Snapshots":  snapshots,
+			"TopGainers": topGainers,
+			"TopLosers":  topLosers,
 			"ActivePage": "snapshots",
 		})
 	})
@@ -339,6 +1054,8 @@ func main() {
 	router.POST("/add-ticker", func(c *gin.Context) {
 		name := strings.ToUpper(c.PostForm("name"))
 		priceStr := strings.Replace(c.PostForm("current_price"), ",", ".", -1)
+		yahooTicker := c.PostForm("yahoo_finance_ticker")
+		yahooEur := c.PostForm("yahoo_eur") == "on"
 
 		if name == "" {
 			c.String(http.StatusBadRequest, "El nombre del ticker es obligatorio.")
@@ -357,7 +1074,25 @@ func main() {
 			return
 		}
 
-		newTicker := Ticker{Name: name, CurrentPrice: price}
+		newTicker := Ticker{Name: name, CurrentPrice: price, YahooFinanceTicker: yahooTicker, YahooEur: yahooEur, Active: true}
+
+		// Manejar Grupo
+		groupIDStr := c.PostForm("group_id")
+		newGroupName := c.PostForm("new_group_name")
+
+		if newGroupName != "" {
+			var group TickerGroup
+			if db.Where("name = ?", newGroupName).First(&group).Error != nil {
+				group = TickerGroup{Name: newGroupName}
+				db.Create(&group)
+			}
+			newTicker.GroupID = &group.ID
+		} else if groupIDStr != "" && groupIDStr != "0" {
+			gid, _ := strconv.Atoi(groupIDStr)
+			ugid := uint(gid)
+			newTicker.GroupID = &ugid
+		}
+
 		db.Create(&newTicker)
 
 		log.Printf("Nuevo ticker creado: %s", name)
@@ -381,6 +1116,9 @@ func main() {
 
 		name := strings.ToUpper(c.PostForm("name"))
 		priceStr := strings.Replace(c.PostForm("current_price"), ",", ".", -1)
+		yahooTicker := c.PostForm("yahoo_finance_ticker")
+		yahooEur := c.PostForm("yahoo_eur") == "on"
+		active := c.PostForm("active") == "on"
 
 		if name == "" {
 			c.String(http.StatusBadRequest, "El nombre del ticker es obligatorio.")
@@ -392,9 +1130,38 @@ func main() {
 			price = ticker.CurrentPrice
 		}
 
-		db.Model(&ticker).Updates(map[string]interface{}{
-			"name":          name,
-			"current_price": price,
+		// Manejar Grupo
+		groupIDStr := c.PostForm("group_id")
+		newGroupName := c.PostForm("new_group_name")
+		var gidPtr *uint
+
+		if newGroupName != "" {
+			var group TickerGroup
+			if db.Where("name = ?", newGroupName).First(&group).Error != nil {
+				group = TickerGroup{Name: newGroupName}
+				db.Create(&group)
+			}
+			gidPtr = &group.ID
+		} else if groupIDStr != "" {
+			if groupIDStr == "0" {
+				gidPtr = nil
+			} else {
+				gid, _ := strconv.Atoi(groupIDStr)
+				ugid := uint(gid)
+				gidPtr = &ugid
+			}
+		} else {
+			gidPtr = ticker.GroupID
+		}
+
+		// Actualizar campos usando Select para incluir campos vacíos
+		db.Model(&ticker).Select("Name", "CurrentPrice", "YahooFinanceTicker", "YahooEur", "GroupID", "Active").Updates(Ticker{
+			Name:               name,
+			CurrentPrice:       price,
+			YahooFinanceTicker: yahooTicker,
+			YahooEur:           yahooEur,
+			GroupID:            gidPtr,
+			Active:             active,
 		})
 
 		log.Printf("Ticker %d actualizado: %s", id, name)
@@ -424,6 +1191,141 @@ func main() {
 		db.Delete(&Ticker{}, id)
 		log.Printf("Ticker %d eliminado", id)
 		c.Redirect(http.StatusFound, "/precios")
+	})
+
+	// Ruta para activar/desactivar un ticker
+	router.POST("/toggle-ticker-active/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, _ := strconv.Atoi(idStr)
+
+		var ticker Ticker
+		if err := db.First(&ticker, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Ticker no encontrado"})
+			return
+		}
+
+		ticker.Active = !ticker.Active
+		db.Save(&ticker)
+
+		c.JSON(http.StatusOK, gin.H{"success": true, "active": ticker.Active})
+	})
+
+	// Ruta para actualizar múltiples precios de tickers que tengan Yahoo Finance Ticker
+	router.POST("/precios", func(c *gin.Context) {
+		var input struct {
+			Tickers []string `json:"tickers"`
+		}
+		if err := c.BindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "JSON inválido: " + err.Error()})
+			return
+		}
+
+		if len(input.Tickers) == 0 {
+			c.JSON(http.StatusOK, gin.H{"success": true, "updated_count": 0, "results": []string{}})
+			return
+		}
+
+		// Preparar el cuerpo para el servicio externo
+		jsonData, err := json.Marshal(input)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al preparar la solicitud"})
+			return
+		}
+
+		// Llamar al servicio externo de precios (batch)
+		resp, err := http.Post("http://localhost:3010/precios", "application/json", bytes.NewBuffer(jsonData))
+		if err != nil {
+			log.Printf("Error conectando con servicio de precios: %v", err)
+			c.JSON(http.StatusBadGateway, gin.H{"error": "No se puede conectar con el servicio de precios"})
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			c.JSON(resp.StatusCode, gin.H{"error": "El servicio de precios devolvió un error"})
+			return
+		}
+
+		var priceResults []interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&priceResults); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al decodificar la respuesta del servicio"})
+			return
+		}
+
+		results := []gin.H{}
+		updatedCount := 0
+
+		for i, res := range priceResults {
+			yahooTickerName := input.Tickers[i]
+
+			// Si el servicio devolvió false para este ticker
+			if res == nil || res == false {
+				results = append(results, gin.H{
+					"ticker":  yahooTickerName,
+					"success": false,
+					"error":   "No se pudo obtener el precio",
+				})
+				continue
+			}
+
+			// Mapear el resultado
+			m, ok := res.(map[string]interface{})
+			if !ok {
+				results = append(results, gin.H{
+					"ticker":  yahooTickerName,
+					"success": false,
+					"error":   "Formato de respuesta inválido",
+				})
+				continue
+			}
+
+			// Buscar el ticker en nuestra DB (usando el campo YahooFinanceTicker)
+			var dbTicker Ticker
+			if err := db.Where("yahoo_finance_ticker = ?", yahooTickerName).First(&dbTicker).Error; err != nil {
+				results = append(results, gin.H{
+					"ticker":  yahooTickerName,
+					"success": false,
+					"error":   "Ticker no encontrado en la base de datos",
+				})
+				continue
+			}
+
+			// Lógica de precio según moneda (siguiendo el patrón existente)
+			var price float64
+			if dbTicker.YahooEur {
+				if v, ok := m["precio_usd"].(float64); ok {
+					price = v
+				}
+			} else {
+				if v, ok := m["precio_eur"].(float64); ok {
+					price = v
+				}
+			}
+
+			if price > 0 {
+				dbTicker.CurrentPrice = price
+				db.Save(&dbTicker)
+				updatedCount++
+				results = append(results, gin.H{
+					"ticker":  yahooTickerName,
+					"success": true,
+					"price":   price,
+				})
+			} else {
+				results = append(results, gin.H{
+					"ticker":  yahooTickerName,
+					"success": false,
+					"error":   "Precio inválido recibido",
+				})
+			}
+		}
+
+		log.Printf("Actualización masiva completada: %d tickers actualizados", updatedCount)
+		c.JSON(http.StatusOK, gin.H{
+			"success":       true,
+			"updated_count": updatedCount,
+			"results":       results,
+		})
 	})
 
 	// Ruta para crear un snapshot de precios
@@ -462,6 +1364,7 @@ func main() {
 			})
 			return
 		}
+
 
 		log.Printf("Snapshot creado: %s con %d precios", snapshotID, len(priceHistories))
 		c.JSON(http.StatusOK, gin.H{
@@ -533,15 +1436,16 @@ func main() {
 			operationCost = 0 // Default to 0 if empty or invalid
 		}
 
-		purchaseDate, err := time.Parse("2006-01-02T15:04", purchaseDateStr)
+		purchaseDate, err := time.ParseInLocation("2006-01-02T15:04", purchaseDateStr, time.Local)
 		if err != nil {
 			// Intentar formato sin hora para compatibilidad
-			purchaseDate, err = time.Parse("2006-01-02", purchaseDateStr)
+			purchaseDate, err = time.ParseInLocation("2006-01-02", purchaseDateStr, time.Local)
 			if err != nil {
 				c.String(http.StatusBadRequest, "Formato de fecha inválido.")
 				return
 			}
 		}
+		purchaseDate = purchaseDate.UTC()
 
 		// Verificar que el ticker existe
 		var ticker Ticker
@@ -572,7 +1476,6 @@ func main() {
 		sharesStr := strings.Replace(c.PostForm("shares"), ",", ".", -1)
 		salePriceStr := strings.Replace(c.PostForm("sale_price"), ",", ".", -1)
 		operationCostStr := strings.Replace(c.PostForm("operation_cost"), ",", ".", -1)
-		withheldTaxStr := strings.Replace(c.PostForm("withheld_tax"), ",", ".", -1)
 		redirectTo := c.PostForm("redirect_to")
 		if redirectTo == "" {
 			redirectTo = "/"
@@ -607,20 +1510,16 @@ func main() {
 			operationCost = 0 // Default to 0 if empty or invalid
 		}
 
-		withheldTax, err := strconv.ParseFloat(withheldTaxStr, 64)
-		if err != nil {
-			withheldTax = 0 // Default to 0 if empty or invalid
-		}
-
-		saleDate, err := time.Parse("2006-01-02T15:04", saleDateStr)
+		saleDate, err := time.ParseInLocation("2006-01-02T15:04", saleDateStr, time.Local)
 		if err != nil {
 			// Intentar formato DD/MM/YYYY para compatibilidad
-			saleDate, err = time.Parse("02/01/2006", saleDateStr)
+			saleDate, err = time.ParseInLocation("02/01/2006", saleDateStr, time.Local)
 			if err != nil {
 				c.String(http.StatusBadRequest, "Formato de fecha inválido.")
 				return
 			}
 		}
+		saleDate = saleDate.UTC()
 
 		// Verificar que el ticker existe
 		var ticker Ticker
@@ -636,7 +1535,6 @@ func main() {
 			Shares:        shares,
 			SalePrice:     salePrice,
 			OperationCost: operationCost,
-			WithheldTax:   withheldTax,
 		}
 		db.Create(&newSale)
 
@@ -661,57 +1559,6 @@ func main() {
 		db.Delete(&Sale{}, id)
 
 		log.Printf("Registro de venta con ID %d marcado como eliminado", id)
-		c.Redirect(http.StatusFound, redirectTo)
-	})
-
-	// Ruta para actualizar una venta
-	router.POST("/update-sale/:id", func(c *gin.Context) {
-		idStr := c.Param("id")
-		id, err := strconv.Atoi(idStr)
-		if err != nil {
-			c.String(http.StatusBadRequest, "ID inválido.")
-			return
-		}
-
-		var sale Sale
-		if err := db.First(&sale, id).Error; err != nil {
-			c.String(http.StatusNotFound, "Venta no encontrada.")
-			return
-		}
-
-		// Parsear y validar datos del formulario
-		tickerIDStr := c.PostForm("ticker_id")
-		saleDateStr := c.PostForm("sale_date")
-		sharesStr := strings.Replace(c.PostForm("shares"), ",", ".", -1)
-		salePriceStr := strings.Replace(c.PostForm("sale_price"), ",", ".", -1)
-		operationCostStr := strings.Replace(c.PostForm("operation_cost"), ",", ".", -1)
-		withheldTaxStr := strings.Replace(c.PostForm("withheld_tax"), ",", ".", -1)
-		redirectTo := c.PostForm("redirect_to")
-		if redirectTo == "" {
-			redirectTo = "/ventas"
-		}
-
-		tickerID, _ := strconv.Atoi(tickerIDStr)
-		shares, _ := strconv.ParseFloat(sharesStr, 64)
-		salePrice, _ := strconv.ParseFloat(salePriceStr, 64)
-		operationCost, _ := strconv.ParseFloat(operationCostStr, 64)
-		withheldTax, _ := strconv.ParseFloat(withheldTaxStr, 64)
-		saleDate, err := time.Parse("2006-01-02T15:04", saleDateStr)
-		if err != nil {
-			saleDate, _ = time.Parse("02/01/2006", saleDateStr)
-		}
-
-		// Actualizar el registro
-		db.Model(&sale).Updates(map[string]interface{}{
-			"ticker_id":      tickerID,
-			"sale_date":      saleDate,
-			"shares":         shares,
-			"sale_price":     salePrice,
-			"operation_cost": operationCost,
-			"withheld_tax":   withheldTax,
-		})
-
-		log.Printf("Registro de venta con ID %d actualizado", id)
 		c.Redirect(http.StatusFound, redirectTo)
 	})
 
@@ -800,7 +1647,7 @@ func main() {
 		var purchasesList []PurchaseInfo
 		for _, inv := range investments {
 			purchasesList = append(purchasesList, PurchaseInfo{
-				Date:   inv.PurchaseDate.Format("02 Jan 2006 15:04"),
+				Date:   inv.PurchaseDate.Local().Format("02 Jan 2006 15:04"),
 				Shares: inv.Shares,
 				Price:  inv.PurchasePrice,
 				Total:  inv.Shares * inv.PurchasePrice,
@@ -812,7 +1659,7 @@ func main() {
 
 		c.JSON(http.StatusOK, gin.H{
 			"ticker":        sale.Ticker.Name,
-			"sale_date":     sale.SaleDate.Format("02 Jan 2006 15:04"),
+			"sale_date":     sale.SaleDate.Local().Format("02 Jan 2006 15:04"),
 			"shares":        sale.Shares,
 			"sale_price":    sale.SalePrice,
 			"purchases":     purchasesList,
@@ -879,10 +1726,11 @@ func main() {
 		shares, _ := strconv.ParseFloat(sharesStr, 64)
 		purchasePrice, _ := strconv.ParseFloat(purchasePriceStr, 64)
 		operationCost, _ := strconv.ParseFloat(operationCostStr, 64)
-		purchaseDate, err := time.Parse("2006-01-02T15:04", purchaseDateStr)
+		purchaseDate, err := time.ParseInLocation("2006-01-02T15:04", purchaseDateStr, time.Local)
 		if err != nil {
-			purchaseDate, _ = time.Parse("2006-01-02", purchaseDateStr)
+			purchaseDate, _ = time.ParseInLocation("2006-01-02", purchaseDateStr, time.Local)
 		}
+		purchaseDate = purchaseDate.UTC()
 
 		// Actualizar el registro
 		db.Model(&investment).Updates(map[string]interface{}{
@@ -926,10 +1774,11 @@ func main() {
 			return
 		}
 
-		purchaseDate, err := time.Parse("2006-01-02T15:04", input.PurchaseDate)
+		purchaseDate, err := time.ParseInLocation("2006-01-02T15:04", input.PurchaseDate, time.Local)
 		if err != nil {
-			purchaseDate, _ = time.Parse("2006-01-02", input.PurchaseDate)
+			purchaseDate, _ = time.ParseInLocation("2006-01-02", input.PurchaseDate, time.Local)
 		}
+		purchaseDate = purchaseDate.UTC()
 
 		// Actualizar el registro
 		db.Model(&investment).Updates(map[string]interface{}{
@@ -953,7 +1802,7 @@ func main() {
 			"id":               id,
 			"ticker_id":        input.TickerID,
 			"ticker":           ticker.Name,
-			"purchase_date":    purchaseDate.Format("02 Jan 2006 15:04"),
+			"purchase_date":    purchaseDate.Local().Format("02 Jan 2006 15:04"),
 			"shares":           input.Shares,
 			"purchase_price":   input.PurchasePrice,
 			"operation_cost":   input.OperationCost,
@@ -983,7 +1832,7 @@ func main() {
 			"id":             investment.ID,
 			"ticker_id":      investment.TickerID,
 			"ticker":         investment.Ticker.Name,
-			"purchase_date":  investment.PurchaseDate.Format("2006-01-02T15:04"),
+			"purchase_date":  investment.PurchaseDate.Local().Format("2006-01-02T15:04"),
 			"shares":         investment.Shares,
 			"purchase_price": investment.PurchasePrice,
 			"operation_cost": investment.OperationCost,
@@ -1012,7 +1861,6 @@ func main() {
 			Shares        float64 `json:"shares"`
 			SalePrice     float64 `json:"sale_price"`
 			OperationCost float64 `json:"operation_cost"`
-			WithheldTax   float64 `json:"withheld_tax"`
 		}
 
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -1020,10 +1868,11 @@ func main() {
 			return
 		}
 
-		saleDate, err := time.Parse("2006-01-02T15:04", input.SaleDate)
+		saleDate, err := time.ParseInLocation("2006-01-02T15:04", input.SaleDate, time.Local)
 		if err != nil {
-			saleDate, _ = time.Parse("2006-01-02", input.SaleDate)
+			saleDate, _ = time.ParseInLocation("2006-01-02", input.SaleDate, time.Local)
 		}
+		saleDate = saleDate.UTC()
 
 		// Actualizar el registro
 		db.Model(&sale).Updates(map[string]interface{}{
@@ -1032,7 +1881,6 @@ func main() {
 			"shares":         input.Shares,
 			"sale_price":     input.SalePrice,
 			"operation_cost": input.OperationCost,
-			"withheld_tax":   input.WithheldTax,
 		})
 
 		// Obtener el ticker actualizado
@@ -1104,11 +1952,10 @@ func main() {
 			"id":               id,
 			"ticker_id":        input.TickerID,
 			"ticker":           ticker.Name,
-			"sale_date":        saleDate.Format("02 Jan 2006 15:04"),
+			"sale_date":        saleDate.Local().Format("02 Jan 2006 15:04"),
 			"shares":           input.Shares,
 			"sale_price":       input.SalePrice,
 			"operation_cost":   input.OperationCost,
-			"withheld_tax":     input.WithheldTax,
 			"total_sale_value": totalSaleValue,
 			"performance":      performance,
 			"profit":           profit,
@@ -1134,11 +1981,10 @@ func main() {
 			"id":             sale.ID,
 			"ticker_id":      sale.TickerID,
 			"ticker":         sale.Ticker.Name,
-			"sale_date":      sale.SaleDate.Format("2006-01-02T15:04"),
+			"sale_date":      sale.SaleDate.Local().Format("2006-01-02T15:04"),
 			"shares":         sale.Shares,
 			"sale_price":     sale.SalePrice,
 			"operation_cost": sale.OperationCost,
-			"withheld_tax":   sale.WithheldTax,
 		})
 	})
 
@@ -1199,7 +2045,7 @@ func main() {
 				ID:              i.ID,
 				TickerID:        i.TickerID,
 				Ticker:          ticker.Name,
-				PurchaseDate:    i.PurchaseDate.Format("02 Jan 2006 15:04"),
+				PurchaseDate:    i.PurchaseDate.Local().Format("02 Jan 2006 15:04:05"),
 				Shares:          i.Shares,
 				PurchasePrice:   i.PurchasePrice,
 				OperationCost:   i.OperationCost,
@@ -1262,10 +2108,21 @@ func main() {
 		currentShares := 0.0
 		currentCapital := 0.0
 
+		// Datos para el gráfico de WAC
+		var wacChartDates []string
+		var wacChartValues []float64
+
 		for _, e := range events {
 			if e.Type == "buy" {
 				currentShares += e.Shares
 				currentCapital += e.Shares * e.Price
+
+				// Calcular nuevo WAC y registrar punto
+				if currentShares > 0 {
+					wac := currentCapital / currentShares
+					wacChartDates = append(wacChartDates, e.Date.Format("02 Jan 2006 15:04:05"))
+					wacChartValues = append(wacChartValues, wac)
+				}
 			} else if e.Type == "sell" {
 				wac := 0.0
 				if currentShares > 0 {
@@ -1276,13 +2133,40 @@ func main() {
 				// Reducir capital proporcionalmente al WAC
 				currentCapital -= e.Shares * wac
 				currentShares -= e.Shares
+
+				// Registrar punto también en la venta para mantener la línea
+				if wac > 0 {
+					wacChartDates = append(wacChartDates, e.Date.Format("02 Jan 2006 15:04:05"))
+					wacChartValues = append(wacChartValues, wac)
+				}
 			}
 		}
 
 		// WAC final de las acciones en cartera
+		// Usar un umbral pequeño (epsilon) para evitar problemas de precisión de punto flotante
+		const epsilon = 0.000001
 		portfolioWAC := 0.0
-		if currentShares > 0 {
+
+		// Calcular WAC final
+		if currentShares > epsilon {
 			portfolioWAC = currentCapital / currentShares
+		} else {
+			// Si las acciones son efectivamente cero, resetear también el capital
+			currentShares = 0.0
+			currentCapital = 0.0
+		}
+
+		// Agregar punto final "NOW" para que la línea se extienda hasta el presente si tenemos acciones
+		if currentShares > epsilon && portfolioWAC > 0 {
+			wacChartDates = append(wacChartDates, time.Now().Local().Format("02 Jan 2006 15:04:05"))
+			wacChartValues = append(wacChartValues, portfolioWAC)
+		}
+		if currentShares > epsilon {
+			portfolioWAC = currentCapital / currentShares
+		} else {
+			// Si las acciones son efectivamente cero, resetear también el capital
+			currentShares = 0.0
+			currentCapital = 0.0
 		}
 
 		// Construir saleViews con el WAC calculado
@@ -1303,11 +2187,10 @@ func main() {
 				ID:              s.ID,
 				TickerID:        s.TickerID,
 				Ticker:          ticker.Name,
-				SaleDate:        s.SaleDate.Format("02 Jan 2006 15:04"),
+				SaleDate:        s.SaleDate.Local().Format("02 Jan 2006 15:04:05"),
 				Shares:          s.Shares,
 				SalePrice:       s.SalePrice,
 				OperationCost:   s.OperationCost,
-				WithheldTax:     s.WithheldTax,
 				TotalSaleValue:  totalSaleValue,
 				WACAtSale:       wacAtSale,
 				SalePerformance: salePerformance,
@@ -1328,6 +2211,12 @@ func main() {
 		// Utilidad: diferencia entre valor actual y valor ponderado del portafolio
 		utilidad := (ticker.CurrentPrice * currentShares) - (portfolioWAC * currentShares)
 
+		// Calcular distancia al WAC (cuánto falta para llegar al precio ponderado)
+		distanceToWAC := 0.0
+		if ticker.CurrentPrice > 0 && portfolioWAC > 0 {
+			distanceToWAC = ((portfolioWAC - ticker.CurrentPrice) / ticker.CurrentPrice) * 100
+		}
+
 		// Obtener historial de precios del ticker
 		var priceHistories []PriceHistory
 		db.Where("ticker_id = ?", tickerID).Order("created_at asc").Find(&priceHistories)
@@ -1336,7 +2225,7 @@ func main() {
 		var priceChartDates []string
 		var priceChartValues []float64
 		for _, ph := range priceHistories {
-			priceChartDates = append(priceChartDates, ph.CreatedAt.Format("02 Jan 2006 15:04"))
+			priceChartDates = append(priceChartDates, ph.CreatedAt.Format("02 Jan 2006 15:04:05"))
 			priceChartValues = append(priceChartValues, ph.Price)
 		}
 
@@ -1356,6 +2245,10 @@ func main() {
 			saleChartPrices = append(saleChartPrices, s.SalePrice)
 		}
 
+		// Obtener notas del ticker
+		var tickerNotes []TickerNote
+		db.Where("ticker_id = ?", tickerID).Order("date desc").Find(&tickerNotes)
+
 		c.HTML(http.StatusOK, "ticker_detail.html", gin.H{
 			"Ticker":              ticker,
 			"Investments":         investmentViews,
@@ -1366,9 +2259,12 @@ func main() {
 			"TotalCostSell":       totalCostSell,
 			"TotalCosts":          totalCostBuy + totalCostSell,
 			"SharesInPortfolio":   currentShares,
+			"CurrentValue":        ticker.CurrentPrice * currentShares,
 			"PortfolioWAC":        portfolioWAC,
+			"PortfolioWACValue":   currentCapital,
 			"WACPerformance":      wacPerformance,
 			"Utilidad":            utilidad,
+			"DistanceToWAC":       distanceToWAC,
 			"TotalSaleUtility":    totalSaleUtility,
 			"PriceChartDates":     priceChartDates,
 			"PriceChartValues":    priceChartValues,
@@ -1376,6 +2272,9 @@ func main() {
 			"PurchaseChartPrices": purchaseChartPrices,
 			"SaleChartDates":      saleChartDates,
 			"SaleChartPrices":     saleChartPrices,
+			"WACChartDates":       wacChartDates,
+			"WACChartValues":      wacChartValues,
+			"Notes":               tickerNotes,
 			"ActivePage":          "resumen",
 		})
 	})
@@ -1389,7 +2288,7 @@ func main() {
 		}
 		var snapshots []SnapshotInfo
 		db.Model(&PriceHistory{}).
-			Select("DISTINCT snapshot_id, MIN(created_at) as created_at").
+			Select("snapshot_id, MIN(created_at) as created_at").
 			Group("snapshot_id").
 			Order("created_at ASC").
 			Scan(&snapshots)
@@ -1402,106 +2301,87 @@ func main() {
 			return
 		}
 
-		// Obtener todas las inversiones y ventas
+		// Obtener todas las inversiones y ventas para seguir el WAC
 		var allInvestments []Investment
-		db.Preload("Ticker").Order("purchase_date asc").Find(&allInvestments)
+		db.Order("purchase_date asc").Find(&allInvestments)
 
 		var allSales []Sale
-		db.Preload("Ticker").Order("sale_date asc").Find(&allSales)
+		db.Order("sale_date asc").Find(&allSales)
 
-		// Para cada snapshot, calcular la utilidad de la cartera en ese momento
+		// Combinar eventos
+		type Event struct {
+			Date   time.Time
+			Type   string // "buy", "sell"
+			Ticker uint
+			Shares float64
+			Price  float64
+		}
+		var allEvents []Event
+		for _, inv := range allInvestments {
+			allEvents = append(allEvents, Event{Date: inv.PurchaseDate, Type: "buy", Ticker: inv.TickerID, Shares: inv.Shares, Price: inv.PurchasePrice})
+		}
+		for _, sale := range allSales {
+			allEvents = append(allEvents, Event{Date: sale.SaleDate, Type: "sell", Ticker: sale.TickerID, Shares: sale.Shares, Price: sale.SalePrice})
+		}
+		sort.Slice(allEvents, func(i, j int) bool {
+			if allEvents[i].Date.Equal(allEvents[j].Date) {
+				return allEvents[i].Type == "buy"
+			}
+			return allEvents[i].Date.Before(allEvents[j].Date)
+		})
+
+		// Mapa para seguir el estado de cada ticker
+		type TickerState struct {
+			Shares  float64
+			Capital float64
+		}
+		tickerStates := make(map[uint]TickerState)
+
+		// Cargar todos los price histories en una sola query y agrupar en memoria
+		// para evitar N queries (una por snapshot) contra Supabase.
+		var allPriceHistories []PriceHistory
+		db.Select("snapshot_id, ticker_id, price").Find(&allPriceHistories)
+		pricesBySnapshot := make(map[string][]PriceHistory, len(snapshots))
+		for _, ph := range allPriceHistories {
+			pricesBySnapshot[ph.SnapshotID] = append(pricesBySnapshot[ph.SnapshotID], ph)
+		}
+
 		var dates []string
 		var utilities []float64
+		eventIdx := 0
 
 		for _, snapshot := range snapshots {
-			// Obtener los precios de este snapshot
-			var priceHistories []PriceHistory
-			db.Where("snapshot_id = ?", snapshot.SnapshotID).Find(&priceHistories)
+			// Procesar eventos hasta este snapshot
+			for eventIdx < len(allEvents) && (allEvents[eventIdx].Date.Before(snapshot.CreatedAt) || allEvents[eventIdx].Date.Equal(snapshot.CreatedAt)) {
+				e := allEvents[eventIdx]
+				state := tickerStates[e.Ticker]
 
-			// Crear mapa de precios del snapshot
-			snapshotPrices := make(map[uint]float64)
-			for _, ph := range priceHistories {
-				snapshotPrices[ph.TickerID] = ph.Price
-			}
-
-			// Filtrar inversiones y ventas hasta la fecha del snapshot
-			type Event struct {
-				Date   time.Time
-				Type   string
-				Shares float64
-				Price  float64
-			}
-
-			tickerEvents := make(map[uint][]Event)
-
-			// Agregar compras hasta la fecha del snapshot
-			for _, inv := range allInvestments {
-				if inv.PurchaseDate.Before(snapshot.CreatedAt) || inv.PurchaseDate.Equal(snapshot.CreatedAt) {
-					tickerEvents[inv.TickerID] = append(tickerEvents[inv.TickerID], Event{
-						Date:   inv.PurchaseDate,
-						Type:   "buy",
-						Shares: inv.Shares,
-						Price:  inv.PurchasePrice,
-					})
+				if e.Type == "buy" {
+					state.Shares += e.Shares
+					state.Capital += e.Shares * e.Price
+				} else if e.Type == "sell" {
+					wac := 0.0
+					if state.Shares > 0 {
+						wac = state.Capital / state.Shares
+					}
+					state.Capital -= e.Shares * wac
+					state.Shares -= e.Shares
 				}
+
+				tickerStates[e.Ticker] = state
+				eventIdx++
 			}
 
-			// Agregar ventas hasta la fecha del snapshot
-			for _, sale := range allSales {
-				if sale.SaleDate.Before(snapshot.CreatedAt) || sale.SaleDate.Equal(snapshot.CreatedAt) {
-					tickerEvents[sale.TickerID] = append(tickerEvents[sale.TickerID], Event{
-						Date:   sale.SaleDate,
-						Type:   "sell",
-						Shares: sale.Shares,
-						Price:  sale.SalePrice,
-					})
-				}
-			}
-
-			// Calcular el estado de la cartera en este snapshot
 			totalUtility := 0.0
-
-			for tickerID, events := range tickerEvents {
-				// Ordenar eventos por fecha
-				sort.Slice(events, func(i, j int) bool {
-					if events[i].Date.Equal(events[j].Date) {
-						return events[i].Type == "buy"
-					}
-					return events[i].Date.Before(events[j].Date)
-				})
-
-				currentShares := 0.0
-				currentCapital := 0.0
-
-				for _, e := range events {
-					if e.Type == "buy" {
-						currentShares += e.Shares
-						currentCapital += e.Shares * e.Price
-					} else if e.Type == "sell" {
-						wac := 0.0
-						if currentShares > 0 {
-							wac = currentCapital / currentShares
-						}
-						currentCapital -= e.Shares * wac
-						currentShares -= e.Shares
-					}
-				}
-
-				// Calcular utilidad para este ticker
-				if currentShares > 0 {
-					snapshotPrice, exists := snapshotPrices[tickerID]
-					if exists {
-						wac := 0.0
-						if currentShares > 0 {
-							wac = currentCapital / currentShares
-						}
-						utility := (snapshotPrice - wac) * currentShares
-						totalUtility += utility
-					}
+			for _, ph := range pricesBySnapshot[snapshot.SnapshotID] {
+				state := tickerStates[ph.TickerID]
+				if state.Shares > 0.000001 {
+					wac := state.Capital / state.Shares
+					totalUtility += (ph.Price - wac) * state.Shares
 				}
 			}
 
-			dates = append(dates, snapshot.CreatedAt.Format("02 Jan 2006 15:04"))
+			dates = append(dates, snapshot.CreatedAt.Format("02 Jan 2006 15:04:05"))
 			utilities = append(utilities, totalUtility)
 		}
 
@@ -1526,12 +2406,19 @@ func setupDatabase() (*gorm.DB, error) {
 		return nil, fmt.Errorf("falta la variable de entorno DATABASE_URL")
 	}
 
-	// Agregar parámetro para desactivar prepared statements (necesario para connection pooler de Supabase)
-	if !strings.Contains(dsn, "prepared_statements") {
+	// Agregar parámetros necesarios
+	if !strings.Contains(dsn, "prepare") {
 		if strings.Contains(dsn, "?") {
 			dsn += "&prepare=false"
 		} else {
 			dsn += "?prepare=false"
+		}
+	}
+	if !strings.Contains(dsn, "TimeZone") {
+		if strings.Contains(dsn, "?") {
+			dsn += "&TimeZone=UTC"
+		} else {
+			dsn += "?TimeZone=UTC"
 		}
 	}
 
@@ -1558,9 +2445,19 @@ func runMigrations(database *gorm.DB) error {
 
 	// Definir todas las migraciones disponibles
 	migrations := map[string]func(*gorm.DB) error{
-		"001_create_initial_schema":       migration001CreateInitialSchema,
-		"002_migrate_to_ticker_id_schema": migration002MigrateToTickerIDSchema,
-		"003_create_price_history_table":  migration003CreatePriceHistoryTable,
+		"001_create_initial_schema":           migration001CreateInitialSchema,
+		"002_migrate_to_ticker_id_schema":     migration002MigrateToTickerIDSchema,
+		"003_create_price_history_table":      migration003CreatePriceHistoryTable,
+		"004_add_yahoo_finance_ticker_column": migration004AddYahooFinanceTickerColumn,
+		"005_create_notes_table":              migration005CreateNotesTable,
+		"006_add_usdeur_column":               migration006AddUsdEurColumn,
+		"007_create_ticker_notes_table":       migration007CreateTickerNotesTable,
+		"008_drop_tax_column":                 migration008DropTaxColumn,
+		"009_create_ticker_groups_table":      migration009CreateTickerGroupsTable,
+		"010_add_active_column_to_tickers":    migration010AddActiveColumnToTickers,
+		"011_rename_usdeur_to_yahooeur":       migration011RenameUsdEurToYahooEur,
+		"012_fix_yahoo_eur_column":            migration012FixYahooEurColumn,
+		"013_create_dividends_table":          migration013CreateDividendsTable,
 	}
 
 	// Obtener migraciones ya aplicadas
@@ -1774,16 +2671,69 @@ func migration003CreatePriceHistoryTable(database *gorm.DB) error {
 	return nil
 }
 
-func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, float64, float64, float64, map[uint]float64, float64, float64, int, error) {
-	// 1. Obtener todos los tickers con sus precios
+// migration004AddYahooFinanceTickerColumn agrega la columna yahoo_finance_ticker a la tabla tickers
+func migration004AddYahooFinanceTickerColumn(database *gorm.DB) error {
+	log.Println("Agregando columna yahoo_finance_ticker a tabla tickers...")
+
+	if !database.Migrator().HasColumn(&Ticker{}, "YahooFinanceTicker") {
+		if err := database.Migrator().AddColumn(&Ticker{}, "YahooFinanceTicker"); err != nil {
+			return fmt.Errorf("error al agregar columna yahoo_finance_ticker: %v", err)
+		}
+		log.Println("  Columna yahoo_finance_ticker agregada exitosamente")
+	} else {
+		log.Println("  Columna yahoo_finance_ticker ya existe")
+	}
+
+	return nil
+}
+
+// migration006AddUsdEurColumn agrega la columna usdeur a la tabla tickers
+func migration006AddUsdEurColumn(database *gorm.DB) error {
+	log.Println("Agregando columna usdeur a tabla tickers...")
+
+	if !database.Migrator().HasColumn(&Ticker{}, "YahooEur") {
+		if err := database.Migrator().AddColumn(&Ticker{}, "YahooEur"); err != nil {
+			return fmt.Errorf("error al agregar columna yahoo_eur: %v", err)
+		}
+		log.Println("  Columna yahoo_eur agregada exitosamente")
+	} else {
+		log.Println("  Columna yahoo_eur ya existe")
+	}
+
+	return nil
+}
+
+// migration008DropTaxColumn elimina la columna withheld_tax de la tabla sales
+func migration008DropTaxColumn(database *gorm.DB) error {
+	log.Println("Eliminando columna withheld_tax de tabla sales...")
+
+	// Verificar si la columna existe en la tabla sales
+	if database.Migrator().HasColumn("sales", "withheld_tax") {
+		if err := database.Migrator().DropColumn("sales", "withheld_tax"); err != nil {
+			return fmt.Errorf("error al eliminar columna withheld_tax: %v", err)
+		}
+		log.Println("  Columna withheld_tax eliminada exitosamente")
+	} else {
+		log.Println("  Columna withheld_tax no existe")
+	}
+
+	return nil
+}
+
+func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, float64, float64, float64, map[uint]float64, float64, float64, int, float64, error) {
+	// 1. Obtener todos los tickers con sus precios y sus grupos
 	var tickers []Ticker
-	db.Find(&tickers)
+	db.Preload("Group").Find(&tickers)
 
 	tickerPrices := make(map[uint]float64)
 	tickerNames := make(map[uint]string)
+	tickerGroups := make(map[uint]string)
 	for _, t := range tickers {
 		tickerPrices[t.ID] = t.CurrentPrice
 		tickerNames[t.ID] = t.Name
+		if t.Group.Name != "" {
+			tickerGroups[t.ID] = t.Group.Name
+		}
 	}
 
 	// 2. Obtener todas las inversiones de la BD con preload del ticker
@@ -1811,7 +2761,7 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			ID:              i.ID,
 			TickerID:        i.TickerID,
 			Ticker:          tickerName,
-			PurchaseDate:    i.PurchaseDate.Format("02 Jan 2006 15:04"),
+			PurchaseDate:    i.PurchaseDate.Local().Format("02 Jan 2006 15:04"),
 			Shares:          i.Shares,
 			PurchasePrice:   i.PurchasePrice,
 			OperationCost:   i.OperationCost,
@@ -1833,7 +2783,11 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 	for _, view := range investmentViews {
 		summary, ok := summaries[view.TickerID]
 		if !ok {
-			summary = &TickerSummaryView{TickerID: view.TickerID, Ticker: view.Ticker}
+			summary = &TickerSummaryView{
+				TickerID:  view.TickerID,
+				Ticker:    view.Ticker,
+				GroupName: tickerGroups[view.TickerID],
+			}
 			summaries[view.TickerID] = summary
 		}
 
@@ -1848,16 +2802,13 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 	var sales []Sale
 	db.Preload("Ticker").Order("sale_date desc").Find(&sales)
 
-	// Calcular el monto total de ventas por ticker
+	// Calcular el monto total de ventas por ticker y agregar costos de operación de ventas
 	tickerSalesAmount := make(map[uint]float64)
 	for _, s := range sales {
 		tickerSalesAmount[s.TickerID] += s.Shares * s.SalePrice
-	}
-
-	// Restar el monto de ventas de CurrentInvestment
-	for tickerID, salesAmount := range tickerSalesAmount {
-		if summary, ok := summaries[tickerID]; ok {
-			summary.CurrentInvestment -= salesAmount
+		totalOperationCost += s.OperationCost
+		if summary, ok := summaries[s.TickerID]; ok {
+			summary.TotalCost += s.OperationCost
 		}
 	}
 
@@ -1865,11 +2816,6 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 	for _, summary := range summaries {
 		summaryViews = append(summaryViews, *summary)
 	}
-
-	// Ordenar summaryViews por nombre del ticker
-	sort.Slice(summaryViews, func(i, j int) bool {
-		return summaryViews[i].Ticker < summaryViews[j].Ticker
-	})
 
 	// Calcular WAC (Weighted Average Cost) histórico para cada venta
 	type Event struct {
@@ -1961,9 +2907,23 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 	}
 	portfolioUtility := totalPortfolioCurrentValue - totalPortfolioWACValue
 
-	// Actualizar summaries con el cálculo correcto basado en WAC
+	// Calcular utilidad de ventas por ticker
+	tickerSalesProfit := make(map[uint]float64)
+	for _, s := range sales {
+		wac := saleWACs[s.ID]
+		saleUtility := (s.SalePrice - wac) * s.Shares
+		tickerSalesProfit[s.TickerID] += saleUtility
+	}
+
+	// Actualizar summaries con el cálculo correcto basado en WAC y utilidad de ventas
 	for i := range summaryViews {
 		tickerID := summaryViews[i].TickerID
+
+		// Asignar utilidad de ventas si existe para este ticker
+		if profit, ok := tickerSalesProfit[tickerID]; ok {
+			summaryViews[i].SalesProfit = profit
+		}
+
 		if state, ok := tickerFinalState[tickerID]; ok && state.Shares > 0 {
 			currentPrice := tickerPrices[tickerID]
 			wac := 0.0
@@ -1972,6 +2932,7 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			}
 			// Utilidad = (Precio Actual * Acciones) - (WAC * Acciones)
 			summaryViews[i].TotalShares = state.Shares
+			summaryViews[i].CurrentInvestment = state.Capital // Inversión actual = Capital restante (Cost basis)
 			summaryViews[i].CurrentValue = state.Shares * currentPrice
 			summaryViews[i].ProfitLoss = (currentPrice * state.Shares) - (wac * state.Shares)
 			// Rendimiento = ((Precio Actual - WAC) / WAC) * 100
@@ -1979,11 +2940,19 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 				summaryViews[i].Performance = ((currentPrice - wac) / wac) * 100
 			}
 		} else {
-			// Si no hay acciones en cartera, poner todo en 0
+			// Si no hay acciones en cartera, poner todo en 0 excepto lo ya calculado
 			summaryViews[i].TotalShares = 0
+			summaryViews[i].CurrentInvestment = 0
 			summaryViews[i].CurrentValue = 0
 			summaryViews[i].ProfitLoss = 0
 			summaryViews[i].Performance = 0
+		}
+
+		// Calcular peso porcentual en la cartera
+		if totalPortfolioCurrentValue > 0 {
+			summaryViews[i].WeightPercentage = (summaryViews[i].CurrentValue / totalPortfolioCurrentValue) * 100
+		} else {
+			summaryViews[i].WeightPercentage = 0
 		}
 	}
 
@@ -1994,6 +2963,11 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			numPositions++
 		}
 	}
+
+	// Ordenar summaryViews por peso porcentual (de mayor a menor)
+	sort.Slice(summaryViews, func(i, j int) bool {
+		return summaryViews[i].WeightPercentage > summaryViews[j].WeightPercentage
+	})
 
 	var saleViews []SaleView
 	for _, s := range sales {
@@ -2024,11 +2998,10 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 			ID:              s.ID,
 			TickerID:        s.TickerID,
 			Ticker:          tickerName,
-			SaleDate:        s.SaleDate.Format("02 Jan 2006 15:04"),
+			SaleDate:        s.SaleDate.Local().Format("02 Jan 2006 15:04"),
 			Shares:          s.Shares,
 			SalePrice:       s.SalePrice,
 			OperationCost:   s.OperationCost,
-			WithheldTax:     s.WithheldTax,
 			TotalSaleValue:  totalSaleValue,
 			CurrentPrice:    currentPrice,
 			CurrentValue:    currentValue,
@@ -2042,5 +3015,130 @@ func getInvestmentData() ([]InvestmentView, []TickerSummaryView, []SaleView, flo
 		saleViews = append(saleViews, view)
 	}
 
-	return investmentViews, summaryViews, saleViews, totalCapital, netProfitLoss, totalOperationCost, tickerPrices, portfolioPerformance, portfolioUtility, numPositions, nil
+	return investmentViews, summaryViews, saleViews, totalCapital, netProfitLoss, totalOperationCost, tickerPrices, portfolioPerformance, portfolioUtility, numPositions, totalPortfolioCurrentValue, nil
+}
+
+// migration009CreateTickerGroupsTable crea la tabla ticker_groups y agrega la columna group_id a tickers
+func migration009CreateTickerGroupsTable(database *gorm.DB) error {
+	log.Println("Creando tabla ticker_groups y actualizando tabla tickers...")
+
+	// Crear tabla ticker_groups si no existe
+	if !database.Migrator().HasTable("ticker_groups") {
+		if err := database.AutoMigrate(&TickerGroup{}); err != nil {
+			return err
+		}
+		log.Println("  Tabla ticker_groups creada exitosamente")
+	}
+
+	// Agregar columna group_id a tickers si no existe
+	if !database.Migrator().HasColumn(&Ticker{}, "GroupID") {
+		if err := database.Migrator().AddColumn(&Ticker{}, "GroupID"); err != nil {
+			return fmt.Errorf("error al agregar columna group_id: %v", err)
+		}
+		log.Println("  Columna group_id agregada exitosamente")
+
+		// Agregar llave foránea manualmente si es necesario (GORM suele hacerlo con AutoMigrate pero AddColumn no)
+		database.Exec("ALTER TABLE tickers ADD CONSTRAINT fk_tickers_group FOREIGN KEY (group_id) REFERENCES ticker_groups(id)")
+	}
+
+	return nil
+}
+
+// migration010AddActiveColumnToTickers agrega la columna active a la tabla tickers y la inicializa en true
+func migration010AddActiveColumnToTickers(database *gorm.DB) error {
+	log.Println("Agregando columna active a tabla tickers...")
+
+	if !database.Migrator().HasColumn(&Ticker{}, "Active") {
+		if err := database.Migrator().AddColumn(&Ticker{}, "Active"); err != nil {
+			return fmt.Errorf("error al agregar columna active: %v", err)
+		}
+		log.Println("  Columna active agregada exitosamente")
+	} else {
+		log.Println("  Columna active ya existe")
+	}
+
+	// Asegurarse de que todos los registros actuales estén activos
+	log.Println("Activando todos los tickers existentes...")
+	if err := database.Model(&Ticker{}).Where("1=1").Update("active", true).Error; err != nil {
+		return fmt.Errorf("error al activar tickers: %v", err)
+	}
+
+	return nil
+}
+
+// migration011RenameUsdEurToYahooEur renombra la columna y voltea el valor booleano
+// Antes: true = USD, false = EUR. Ahora: true = EUR, false = USD.
+func migration011RenameUsdEurToYahooEur(database *gorm.DB) error {
+	log.Println("Renombrando columna usdeur a yahoo_eur e invirtiendo lógica...")
+
+	// 1. Renombrar si existe la antigua y no la nueva
+	if database.Migrator().HasColumn(&Ticker{}, "UsdEur") {
+		// En PostgreSQL GORM suele usar snake_case: UsdEur -> usd_eur
+		if err := database.Exec("ALTER TABLE tickers RENAME COLUMN usd_eur TO yahoo_eur").Error; err != nil {
+			log.Printf("Aviso: No se pudo renombrar via SQL directo (tal vez ya se renombro): %v", err)
+		} else {
+			log.Println("  Columna renombrada a yahoo_eur")
+		}
+
+		// 2. Invertir los valores: true -> false (era USD, ahora no es EUR), false -> true (era EUR, ahora es EUR)
+		if err := database.Exec("UPDATE tickers SET yahoo_eur = NOT yahoo_eur").Error; err != nil {
+			return fmt.Errorf("error al invertir valores booleanos: %v", err)
+		}
+		log.Println("  Valores invertidos (True ahora significa EUR)")
+	} else {
+		log.Println("  La migración ya parece haber sido aplicada o la columna no existe")
+	}
+
+	return nil
+}
+
+// migration012FixYahooEurColumn asegura que la columna se llame yahoo_eur y los valores estén invertidos correctamente.
+func migration012FixYahooEurColumn(database *gorm.DB) error {
+	log.Println("Ejecutando migración 012: Asegurando columna yahoo_eur...")
+
+	// 1. Verificar si existe la columna antigua usd_eur
+	var hasUsdEur bool
+	database.Raw("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tickers' AND column_name = 'usd_eur')").Scan(&hasUsdEur)
+
+	if hasUsdEur {
+		log.Println("  Detectada columna antigua 'usd_eur'. Renombrando e invirtiendo valores...")
+		if err := database.Exec("ALTER TABLE tickers RENAME COLUMN usd_eur TO yahoo_eur").Error; err != nil {
+			log.Printf("Aviso: No se pudo renombrar via SQL directo (tal vez ya se renombro): %v", err)
+		} else {
+			// Invertir: lo que era USD (true) ahora es NO EUR (false). Lo que era EUR (false) ahora es EUR (true).
+			if err := database.Exec("UPDATE tickers SET yahoo_eur = NOT yahoo_eur").Error; err != nil {
+				return fmt.Errorf("error al invertir valores: %v", err)
+			}
+			log.Println("  Columna 'usd_eur' migrada a 'yahoo_eur' satisfactoriamente")
+		}
+	} else {
+		// Verificar si existe yahoo_eur. Si no existe, crearla.
+		var hasYahooEur bool
+		database.Raw("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tickers' AND column_name = 'yahoo_eur')").Scan(&hasYahooEur)
+
+		if !hasYahooEur {
+			log.Println("  No se encontró 'usd_eur' ni 'yahoo_eur'. Creando 'yahoo_eur'...")
+			if err := database.Migrator().AddColumn(&Ticker{}, "YahooEur"); err != nil {
+				return err
+			}
+		} else {
+			log.Println("  La columna 'yahoo_eur' ya existe.")
+		}
+	}
+
+	return nil
+}
+
+// migration013CreateDividendsTable crea la tabla dividends
+func migration013CreateDividendsTable(database *gorm.DB) error {
+	log.Println("Creando tabla dividends...")
+	if !database.Migrator().HasTable("dividends") {
+		if err := database.AutoMigrate(&Dividend{}); err != nil {
+			return fmt.Errorf("error al crear tabla dividends: %v", err)
+		}
+		log.Println("  Tabla dividends creada exitosamente")
+	} else {
+		log.Println("  Tabla dividends ya existe")
+	}
+	return nil
 }

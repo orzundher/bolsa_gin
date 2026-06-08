@@ -5,11 +5,148 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestión de Tickers</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/static/img/favicon.png">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Flowbite CSS -->
     <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
     <link href="/static/css/common.css" rel="stylesheet">
+    <style>
+        .inactive-row {
+            opacity: 0.6;
+            filter: grayscale(100%);
+        }
+    </style>
+    <script>
+        async function updatePriceFromYahoo(yahooTicker, isYahooEur, targetInputId, btn) {
+            const originalContent = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<svg class="animate-spin w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Actualizando...`;
+            
+            try {
+                const response = await fetch(`/api/fetch-price/${yahooTicker}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    let price;
+                    // Mantenemos la lógica de conversión:
+                    // Si el ticker es EUR (isYahooEur=true), extraemos el valor en USD.
+                    // Si el ticker es USD (isYahooEur=false), extraemos el valor en EUR.
+                    if (isYahooEur) {
+                        price = data.precio_usd;
+                    } else {
+                        price = data.precio_eur;
+                    }
+                    
+                    if (price !== undefined) {
+                        const input = document.getElementById(targetInputId);
+                        if (input) {
+                            input.value = price.toFixed(4);
+                            // Resaltar brevemente el campo para indicar cambio
+                            input.classList.add('bg-green-100', 'dark:bg-green-900');
+                            setTimeout(() => {
+                                input.classList.remove('bg-green-100', 'dark:bg-green-900');
+                            }, 1000);
+                        }
+                    } else {
+                        console.error(`No se encontró el precio para ${yahooTicker}`);
+                        alert(`No se encontró el precio para ${yahooTicker}`);
+                    }
+                } else {
+                    console.error('Error al obtener el precio:', data.error);
+                    alert('Error al obtener el precio: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error de conexión:', error);
+                alert('Error de conexión con el servicio de precios');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
+        }
+
+        // Funciones para el modal de agregar ticker (definidas antes del body)
+        function openAddTickerModal() {
+            const modal = document.getElementById('add-ticker-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            modal.removeAttribute('aria-hidden');
+            // Reset form
+            document.getElementById('add-name').value = '';
+            document.getElementById('add-price').value = '';
+            document.getElementById('add-yahoo').value = '';
+            document.getElementById('add-yahoo_eur').checked = false;
+            // Focus en el primer campo
+            setTimeout(() => document.getElementById('add-name').focus(), 100);
+        }
+        
+        function closeAddTickerModal() {
+            // Remove focus from any element inside the modal before hiding it
+            if (document.activeElement && document.getElementById('add-ticker-modal').contains(document.activeElement)) {
+                document.activeElement.blur();
+            }
+            const modal = document.getElementById('add-ticker-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+        
+        // Cerrar modal con tecla Escape
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                // Cerrar modal de agregar ticker
+                const addModal = document.getElementById('add-ticker-modal');
+                if (addModal && !addModal.classList.contains('hidden')) {
+                    closeAddTickerModal();
+                    return;
+                }
+                // Cerrar cualquier modal de edición abierto
+                document.querySelectorAll('[id^="edit-modal-"]').forEach(modal => {
+                    if (!modal.classList.contains('hidden')) {
+                         // Extract ID from modal ID string "edit-modal-{id}"
+                        const id = modal.id.replace('edit-modal-', '');
+                        closeEditModal(id);
+                    }
+                });
+            }
+        });
+        
+        // Función para enfocar el campo de precio al hacer clic en una fila
+        function focusPrice(id) {
+            setTimeout(() => {
+                const input = document.getElementById('price-' + id);
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }, 150);
+        }
+        
+        // Funciones para el modal de edición de ticker
+        function openEditModal(id) {
+            const modal = document.getElementById('edit-modal-' + id);
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                modal.removeAttribute('aria-hidden');
+                focusPrice(id);
+            }
+        }
+        
+        function closeEditModal(id) {
+            const modal = document.getElementById('edit-modal-' + id);
+            if (modal) {
+                // Remove focus from any element inside the modal before hiding it
+                if (document.activeElement && modal.contains(document.activeElement)) {
+                    document.activeElement.blur();
+                }
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                modal.setAttribute('aria-hidden', 'true');
+            }
+        }
+    </script>
 </head>
 
 <body class="bg-gray-50 dark:bg-gray-900">
@@ -18,52 +155,80 @@
     <div class="p-4 sm:ml-64">
         <div class="p-4 mt-14">
 
-        <!-- Form Card -->
-        <div class="mb-8">
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-                <h5 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Agregar Nuevo Ticker</h5>
-                <form action="/add-ticker" method="post">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label for="name" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Símbolo</label>
-                            <input type="text" name="name" id="name" placeholder="Ej: AAPL" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" required>
-                        </div>
-                        <div>
-                            <label for="current_price" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Precio Actual</label>
-                            <input type="number" step="any" name="current_price" id="current_price" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                        </div>
-                    </div>
-                    <button type="submit" class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">Agregar Ticker</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Table Header with Snapshot Button -->
+        <!-- Table Header with Action Buttons -->
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Tickers Registrados</h2>
-            <button type="button" id="snapshotBtn" data-modal-target="snapshot-confirm-modal" data-modal-toggle="snapshot-confirm-modal" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-blue-800">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                </svg>
-                Snapshot
-            </button>
+            <div class="flex gap-4 items-center">
+                <!-- Toggle Inactive Filter -->
+                <label class="inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="showInactiveToggle" class="sr-only peer">
+                    <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                    <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Mostrar desactivados</span>
+                </label>
+                <div class="flex gap-2">
+                    <button type="button" onclick="openAddTickerModal()" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:ring-4 focus:outline-none focus:ring-green-300 dark:bg-green-500 dark:hover:bg-green-600 dark:focus:ring-green-800">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Agregar Ticker
+                    </button>
+                    <button type="button" id="updateAllPricesBtn" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:ring-4 focus:outline-none focus:ring-indigo-300 dark:bg-indigo-500 dark:hover:bg-indigo-600 dark:focus:ring-indigo-800">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Actualizar Precios Yahoo
+                    </button>
+                    <button type="button" id="snapshotBtn" data-modal-target="snapshot-confirm-modal" data-modal-toggle="snapshot-confirm-modal" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-blue-800">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        Snapshot
+                    </button>
+                </div>
+            </div>
         </div>
         <div class="relative overflow-x-auto shadow-md sm:rounded-lg">
             <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400" id="tickersTable">
                 <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                     <tr>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Símbolo</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Grupo</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Yahoo Ticker</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">En Cartera</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Precio Actual</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Cambio Snapshots</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Diferencia Actual</th>
+                        <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Estado</th>
                         <th scope="col" class="px-6 py-3 sortable cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">Última Actualización</th>
                         <th scope="col" class="px-6 py-3">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {{range .Tickers}}
-                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer" data-modal-target="edit-modal-{{.ID}}" data-modal-toggle="edit-modal-{{.ID}}" onclick="focusPrice({{.ID}})">
+                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer {{if not .Active}}inactive-row{{end}}" 
+                        onclick="openEditModal({{.ID}})"
+                        data-active="{{.Active}}">
                         <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{{.Name}}</th>
+                        <td class="px-6 py-4 text-gray-500 dark:text-gray-400 font-semibold">{{if .GroupName}}{{.GroupName}}{{else}}—{{end}}</td>
+                        <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{if .YahooFinanceTicker}}{{.YahooFinanceTicker}}{{else}}—{{end}}</td>
+                        <td class="px-6 py-4">
+                            {{if .HasShares}}
+                            <span class="inline-flex items-center bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">
+                                <svg class="w-3 h-3 me-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                </svg>
+                                Sí
+                            </span>
+                            {{else}}
+                            <span class="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-gray-700 dark:text-gray-300">
+                                <svg class="w-3 h-3 me-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                </svg>
+                                No
+                            </span>
+                            {{end}}
+                        </td>
                         <td class="px-6 py-4">{{printf "%.4f€" .CurrentPrice}}</td>
                         <td class="px-6 py-4">
                             {{if .HasSnapshotChange}}
@@ -87,6 +252,35 @@
                             {{else}}
                                 <span class="text-gray-400 dark:text-gray-500">—</span>
                             {{end}}
+                        </td>
+                        <td class="px-6 py-4">
+                            {{if .HasCurrentToSnapshotPct}}
+                                {{if gt .CurrentToSnapshotPct 0.0}}
+                                    <span class="inline-flex items-center text-green-600 dark:text-green-400 font-semibold">
+                                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                        +{{printf "%.2f" .CurrentToSnapshotPct}}%
+                                    </span>
+                                {{else if lt .CurrentToSnapshotPct 0.0}}
+                                    <span class="inline-flex items-center text-red-600 dark:text-red-400 font-semibold">
+                                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                        {{printf "%.2f" .CurrentToSnapshotPct}}%
+                                    </span>
+                                {{else}}
+                                    <span class="text-gray-500 dark:text-gray-400">0.00%</span>
+                                {{end}}
+                            {{else}}
+                                <span class="text-gray-400 dark:text-gray-500">—</span>
+                            {{end}}
+                        </td>
+                        <td class="px-6 py-4">
+                            <label class="inline-flex items-center cursor-pointer" onclick="event.stopPropagation();">
+                                <input type="checkbox" class="sr-only peer" {{if .Active}}checked{{end}} onchange="toggleTickerActive({{.ID}}, this)">
+                                <div class="relative w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                            </label>
                         </td>
                         <td class="px-6 py-4">{{.UpdatedAt}}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
@@ -146,6 +340,69 @@
         </div>
     </div>
 
+    <!-- Modal de agregar ticker -->
+    <div id="add-ticker-modal" tabindex="-1" aria-hidden="true" class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full">
+        <div class="relative p-4 w-full max-w-md max-h-full">
+            <!-- Modal content -->
+            <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
+                <!-- Modal header -->
+                <div class="flex items-center justify-between p-4 md:p-5 border-b rounded-t dark:border-gray-600">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                        Agregar Nuevo Ticker
+                    </h3>
+                    <button type="button" onclick="closeAddTickerModal()" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white">
+                        <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                        </svg>
+                        <span class="sr-only">Cerrar</span>
+                    </button>
+                </div>
+                <!-- Modal body -->
+                <form action="/add-ticker" method="post" class="p-4 md:p-5">
+                    <div class="grid gap-4 mb-4">
+                        <div>
+                            <label for="add-name" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Símbolo</label>
+                            <input type="text" name="name" id="add-name" placeholder="Ej: AAPL" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                        </div>
+                        <div>
+                            <label for="add-price" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Precio Actual</label>
+                            <input type="number" step="any" name="current_price" id="add-price" placeholder="0.00" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                        </div>
+                        <div>
+                            <label for="add-yahoo" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Yahoo Finance Ticker</label>
+                            <input type="text" name="yahoo_finance_ticker" id="add-yahoo" placeholder="Ej: AAPL" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                        </div>
+                        <div class="flex items-center gap-4 mb-4">
+                            <div class="flex items-center">
+                                <input id="add-yahoo_eur" type="checkbox" name="yahoo_eur" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                                <label for="add-yahoo_eur" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">Yahoo EUR</label>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="add-group-id" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Grupo Existente</label>
+                                <select name="group_id" id="add-group-id" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                                    <option value="0">Sin grupo</option>
+                                    {{range $.Groups}}
+                                    <option value="{{.ID}}">{{.Name}}</option>
+                                    {{end}}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="add-new-group" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Nuevo Grupo</label>
+                                <input type="text" name="new_group_name" id="add-new-group" placeholder="Ej: Tech" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2">
+                        <button type="button" onclick="closeAddTickerModal()" class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600">Cancelar</button>
+                        <button type="submit" class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">Agregar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Modales de edición -->
     {{range .Tickers}}
     <div id="edit-modal-{{.ID}}" tabindex="-1" aria-hidden="true" class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full">
@@ -157,7 +414,7 @@
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
                         Actualizar Ticker
                     </h3>
-                    <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" data-modal-toggle="edit-modal-{{.ID}}">
+                    <button type="button" onclick="closeEditModal({{.ID}})" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white">
                         <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
                             <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
                         </svg>
@@ -172,12 +429,50 @@
                             <input type="text" name="name" id="name-{{.ID}}" value="{{.Name}}" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
                         </div>
                         <div>
-                            <label for="price-{{.ID}}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Precio Actual</label>
-                            <input type="number" step="any" name="current_price" id="price-{{.ID}}" value="{{printf "%.4f" .CurrentPrice}}" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                            <div class="flex items-center justify-between mb-2">
+                                <label for="price-{{.ID}}" class="block text-sm font-medium text-gray-900 dark:text-white">Precio Actual</label>
+                                {{if .YahooFinanceTicker}}
+                                <button type="button" onclick="updatePriceFromYahoo('{{.YahooFinanceTicker}}', {{.YahooEur}}, 'price-{{.ID}}', this)" class="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                    Actualizar desde Yahoo
+                                </button>
+                                {{end}}
+                            </div>
+                            <input type="number" step="any" name="current_price" id="price-{{.ID}}" value="{{printf "%.4f" .CurrentPrice}}" autocomplete="off" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" required>
+                        </div>
+                        <div>
+                            <label for="yahoo-{{.ID}}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Yahoo Finance Ticker</label>
+                            <input type="text" name="yahoo_finance_ticker" id="yahoo-{{.ID}}" value="{{.YahooFinanceTicker}}" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                        </div>
+                        <div class="flex items-center gap-4 mb-4">
+                            <div class="flex items-center">
+                                <input id="yahoo_eur-{{.ID}}" type="checkbox" name="yahoo_eur" {{if .YahooEur}}checked{{end}} class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                                <label for="yahoo_eur-{{.ID}}" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">Yahoo EUR</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input id="active-{{.ID}}" type="checkbox" name="active" {{if .Active}}checked{{end}} class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                                <label for="active-{{.ID}}" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">Activo</label>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="group-id-{{.ID}}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Grupo Existente</label>
+                                <select name="group_id" id="group-id-{{.ID}}" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                                    <option value="0" {{if eq .GroupID 0}}selected{{end}}>Sin grupo</option>
+                                    {{$currentGroupID := .GroupID}}
+                                    {{range $.Groups}}
+                                    <option value="{{.ID}}" {{if eq .ID $currentGroupID}}selected{{end}}>{{.Name}}</option>
+                                    {{end}}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="new-group-{{.ID}}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Nuevo Grupo</label>
+                                <input type="text" name="new_group_name" id="new-group-{{.ID}}" placeholder="Ej: Tech" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                            </div>
                         </div>
                     </div>
                     <div class="flex justify-end gap-2">
-                        <button type="button" data-modal-toggle="edit-modal-{{.ID}}" class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600">Cancelar</button>
+                        <button type="button" onclick="closeEditModal({{.ID}})" class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600">Cancelar</button>
                         <button type="submit" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">Guardar</button>
                     </div>
                 </form>
@@ -188,9 +483,17 @@
 
     <!-- Flowbite JS -->
     <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
-    <script src="/static/js/table-sort.js"></script>
+    <script src="/static/js/table-sort.js?v=2"></script>
     
     <script>
+        // Cerrar modal al hacer clic fuera
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('add-ticker-modal');
+            if (modal && event.target === modal) {
+                closeAddTickerModal();
+            }
+        });
+
         // Guardar posición del scroll antes de enviar formulario
         document.querySelectorAll('form[action^="/update-ticker"]').forEach(form => {
             form.addEventListener('submit', function() {
@@ -207,19 +510,126 @@
             }
         });
 
-        function focusPrice(id) {
-            setTimeout(() => {
-                const input = document.getElementById('price-' + id);
-                if (input) {
-                    input.focus();
-                    input.select();
+        // Función para filtrar tickers activos/desactivos
+        function filterTickers() {
+            const showInactive = document.getElementById('showInactiveToggle').checked;
+            const rows = document.querySelectorAll('#tickersTable tbody tr');
+
+            rows.forEach(row => {
+                const isActive = row.getAttribute('data-active') === 'true';
+                if (isActive || showInactive) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
                 }
-            }, 150); // Aumentado a 150ms para dar tiempo a Flowbite a actualizar aria-hidden
+            });
+
+            // Guardar preferencia
+            localStorage.setItem('precios_showInactive', showInactive);
         }
 
-        // Función para crear un snapshot de precios
+        // Función para alternar el estado de un ticker mediante AJAX
+        async function toggleTickerActive(id, checkbox) {
+            try {
+                const response = await fetch(`/toggle-ticker-active/${id}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Actualizar la fila
+                    const row = checkbox.closest('tr');
+                    row.setAttribute('data-active', data.active);
+                    if (data.active) {
+                        row.classList.remove('inactive-row');
+                    } else {
+                        row.classList.add('inactive-row');
+                    }
+                    // Aplicar filtro si es necesario
+                    filterTickers();
+                    
+                    // Actualizar el checkbox del modal de este ticker si existe
+                    const modalCheckbox = document.getElementById(`active-${id}`);
+                    if (modalCheckbox) {
+                        modalCheckbox.checked = data.active;
+                    }
+                } else {
+                    alert('Error al cambiar el estado: ' + (data.error || 'error desconocido'));
+                    checkbox.checked = !checkbox.checked; // Revertir
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al procesar la solicitud');
+                checkbox.checked = !checkbox.checked; // Revertir
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
+            // Restaurar preferencia de filtro
+            const showInactive = localStorage.getItem('precios_showInactive') === 'true';
+            const toggle = document.getElementById('showInactiveToggle');
+            if (toggle) {
+                toggle.checked = showInactive;
+                toggle.addEventListener('change', filterTickers);
+            }
+            
+            // Aplicar filtro inicial
+            filterTickers();
+
+            // Lógica para actualizar todos los precios
+            const updateAllBtn = document.getElementById('updateAllPricesBtn');
+            if (updateAllBtn) {
+                updateAllBtn.addEventListener('click', async function() {
+                    // Obtener todos los tickers que tienen Yahoo Ticker
+                    const tickers = [];
+                    {{range .Tickers}}
+                        {{if .YahooFinanceTicker}}
+                            tickers.push('{{.YahooFinanceTicker}}');
+                        {{end}}
+                    {{end}}
+                    
+                    if (tickers.length === 0) {
+                        alert('No hay tickers con nombre de Yahoo configurado.');
+                        return;
+                    }
+                    
+                    if (!confirm(`¿Actualizar los precios de ${tickers.length} tickers desde Yahoo Finance?`)) {
+                        return;
+                    }
+                    
+                    const originalContent = updateAllBtn.innerHTML;
+                    updateAllBtn.disabled = true;
+                    updateAllBtn.innerHTML = `<svg class="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Actualizando...`;
+                    
+                    try {
+                        const response = await fetch('/precios', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ tickers: tickers })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            alert(`✓ Se han actualizado ${data.updated_count} precios correctamente.`);
+                            window.location.reload();
+                        } else {
+                            alert('✗ Error al actualizar precios: ' + (data.error || 'error desconocido'));
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('✗ Error de conexión con el servidor');
+                    } finally {
+                        updateAllBtn.disabled = false;
+                        updateAllBtn.innerHTML = originalContent;
+                    }
+                });
+            }
+
             const confirmSnapshotBtn = document.getElementById('confirm-snapshot-btn');
+            // ... rest of the snapshot logic ...
             
             if (confirmSnapshotBtn) {
                 console.log('Confirm snapshot button found');
