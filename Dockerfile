@@ -16,7 +16,7 @@ RUN go mod download
 COPY . .
 
 # Compilar la aplicación
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o main .
+RUN CGO_ENABLED=0 GOOS=linux go build -p 1 -ldflags="-s -w" -o main .
 
 # Runtime stage
 FROM alpine:latest
