@@ -599,6 +599,26 @@ func main() {
 			return
 		}
 
+		// Cargar todos los dividendos con sus tickers
+		var allDividends []Dividend
+		db.Preload("Ticker").Order("date asc").Find(&allDividends)
+
+		// Agrupar dividendos por símbolo de ticker
+		type divEntry struct {
+			Date   string
+			Amount float64
+			Notes  string
+		}
+		dividendsByTicker := make(map[string][]divEntry)
+		for _, d := range allDividends {
+			sym := d.Ticker.Name
+			dividendsByTicker[sym] = append(dividendsByTicker[sym], divEntry{
+				Date:   d.Date.Format("2006-01-02"),
+				Amount: d.Amount,
+				Notes:  d.Notes,
+			})
+		}
+
 		var b strings.Builder
 		b.WriteString("# Resumen de Inversiones\n")
 		b.WriteString(fmt.Sprintf("# Fecha de exportación: %s\n", time.Now().Local().Format("2006-01-02 15:04:05")))
@@ -616,9 +636,21 @@ func main() {
 				b.WriteString(fmt.Sprintf("profit_loss = %.2f\n", s.ProfitLoss))
 				b.WriteString(fmt.Sprintf("performance = %.2f\n", s.Performance))
 				b.WriteString(fmt.Sprintf("sales_profit = %.2f\n", s.SalesProfit))
+				b.WriteString(fmt.Sprintf("dividends_total = %.2f\n", s.Dividends))
 				b.WriteString(fmt.Sprintf("weight = %.2f\n", s.WeightPercentage))
 				if s.GroupName != "" {
 					b.WriteString(fmt.Sprintf("group = \"%s\"\n", s.GroupName))
+				}
+				// Recibos individuales de dividendos
+				if entries, ok := dividendsByTicker[s.Ticker]; ok {
+					for _, e := range entries {
+						b.WriteString(fmt.Sprintf("  [[tickers.dividends]]\n"))
+						b.WriteString(fmt.Sprintf("  date = \"%s\"\n", e.Date))
+						b.WriteString(fmt.Sprintf("  amount = %.2f\n", e.Amount))
+						if e.Notes != "" {
+							b.WriteString(fmt.Sprintf("  notes = \"%s\"\n", e.Notes))
+						}
+					}
 				}
 				b.WriteString("\n")
 			}

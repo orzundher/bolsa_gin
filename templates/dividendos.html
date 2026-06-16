@@ -222,6 +222,21 @@
                 locale: 'de'
             });
 
+            // Enviar con Enter cuando el modal de agregar está abierto
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    const addModal = document.getElementById('addDividendModal');
+                    const editModal = document.getElementById('editDividendModal');
+                    if (addModal && !addModal.classList.contains('hidden')) {
+                        e.preventDefault();
+                        submitAddDividend();
+                    } else if (editModal && !editModal.classList.contains('hidden')) {
+                        e.preventDefault();
+                        submitEditDividend();
+                    }
+                }
+            });
+
             // Event delegation para botones de editar y eliminar
             document.addEventListener('click', function (e) {
                 const editBtn = e.target.closest('.edit-dividend-btn');
