@@ -256,7 +256,11 @@ func clearAuthSession(c *gin.Context) {
 func isAuthenticated(c *gin.Context) bool {
 	session := sessions.Default(c)
 	auth := session.Get(authSessionKey)
-	return auth != nil && auth.(bool)
+	if auth == nil {
+		return false
+	}
+	authenticated, ok := auth.(bool)
+	return ok && authenticated
 }
 
 func redirectToLogin(c *gin.Context) {
