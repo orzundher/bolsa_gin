@@ -27,7 +27,7 @@ The server starts on `http://localhost:8080` by default (override with `PORT` en
 
 - **`main.go`** (~2,900 lines) — single-file monolith: all GORM models, Gin routes, and business logic live here
 - **`notes_model.go`** — `Note` and `TickerNote` models and their migrations
-- **`templates/`** — 9 server-rendered Go HTML templates (header.html is a partial included by all pages)
+- **`templates/`** — 10 server-rendered Go HTML templates (header.html is a partial included by all pages; login.html is the authentication page)
 - **`static/`** — CSS, vanilla JS, and images; Tailwind + Flowbite via CDN
 
 ### Key data models
@@ -64,7 +64,13 @@ Requires a `.env` file (not committed):
 ```
 DATABASE_URL=postgresql://user:password@host:port/database
 PORT=8080
+AUTH_USER=admin
+AUTH_PASSWORD=change-me
+AUTH_SECRET=a-long-random-secret-for-cookie-signing
 ```
+
+- `AUTH_USER` / `AUTH_PASSWORD`: credenciales para iniciar sesión en la interfaz web y para autenticación Basic Auth en endpoints `/api/*`.
+- `AUTH_SECRET`: clave usada para firmar las cookies de sesión. Genera un valor aleatorio largo en producción.
 
 Database is PostgreSQL hosted on Supabase. Connection uses `prepare=false` and `PreferSimpleProtocol: true` for Supabase pooler compatibility.
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
@@ -175,12 +178,165 @@ var db *gorm.DB
 var preciosAPIKey string
 var preciosBaseURL string
 
+// Credenciales y configuración de autenticación
+var authUser string
+var authPassword string
+var authSecret string
+
+const (
+	authSessionKey = "authenticated"
+	authSessionUser = "user"
+)
+
+func loadAuthConfig() {
+	authUser = os.Getenv("AUTH_USER")
+	authPassword = os.Getenv("AUTH_PASSWORD")
+	authSecret = os.Getenv("AUTH_SECRET")
+
+	if authUser == "" {
+		authUser = "admin"
+		log.Println("AUTH_USER no configurado, usando valor por defecto: admin")
+	}
+	if authPassword == "" {
+		authPassword = "admin"
+		log.Println("AUTH_PASSWORD no configurado, usando valor por defecto: admin")
+	}
+	if authSecret == "" {
+		authSecret = "change-me-in-production"
+		log.Println("AUTH_SECRET no configurado, usando valor por defecto (inseguro)")
+	}
+}
+
+func isPublicPath(path string) bool {
+	return path == "/login" || path == "/logout" || strings.HasPrefix(path, "/static/")
+}
+
+func checkBasicAuth(c *gin.Context) bool {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		return false
+	}
+
+	const prefix = "Basic "
+	if !strings.HasPrefix(authHeader, prefix) {
+		return false
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(authHeader[len(prefix):])
+	if err != nil {
+		return false
+	}
+
+	parts := strings.SplitN(string(decoded), ":", 2)
+	if len(parts) != 2 {
+		return false
+	}
+
+	return parts[0] == authUser && parts[1] == authPassword
+}
+
+func setAuthSession(c *gin.Context) {
+	session := sessions.Default(c)
+	session.Set(authSessionKey, true)
+	session.Set(authSessionUser, authUser)
+	if err := session.Save(); err != nil {
+		log.Printf("Error guardando sesión: %v", err)
+	}
+}
+
+func clearAuthSession(c *gin.Context) {
+	session := sessions.Default(c)
+	session.Delete(authSessionKey)
+	session.Delete(authSessionUser)
+	if err := session.Save(); err != nil {
+		log.Printf("Error limpiando sesión: %v", err)
+	}
+}
+
+func isAuthenticated(c *gin.Context) bool {
+	session := sessions.Default(c)
+	auth := session.Get(authSessionKey)
+	return auth != nil && auth.(bool)
+}
+
+func redirectToLogin(c *gin.Context) {
+	c.Redirect(http.StatusFound, "/login")
+	c.Abort()
+}
+
+func unauthorizedAPI(c *gin.Context) {
+	c.Header("WWW-Authenticate", `Basic realm="bolsa_gin"`)
+	c.JSON(http.StatusUnauthorized, gin.H{"error": "Se requiere autenticación"})
+	c.Abort()
+}
+
+func requireAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		path := c.Request.URL.Path
+
+		if isPublicPath(path) {
+			c.Next()
+			return
+		}
+
+		// Las rutas de API aceptan Basic Auth o sesión de cookie
+		if strings.HasPrefix(path, "/api/") {
+			if isAuthenticated(c) || checkBasicAuth(c) {
+				c.Next()
+				return
+			}
+			unauthorizedAPI(c)
+			return
+		}
+
+		// El resto de rutas requiere sesión de cookie (redirige a login)
+		if isAuthenticated(c) {
+			c.Next()
+			return
+		}
+
+		redirectToLogin(c)
+	}
+}
+
+func handleLoginGet(c *gin.Context) {
+	if isAuthenticated(c) {
+		c.Redirect(http.StatusFound, "/")
+		return
+	}
+	c.HTML(http.StatusOK, "login.html", gin.H{
+		"Error": c.Query("error"),
+	})
+}
+
+func handleLoginPost(c *gin.Context) {
+	username := c.PostForm("username")
+	password := c.PostForm("password")
+
+	if username == authUser && password == authPassword {
+		setAuthSession(c)
+		c.Redirect(http.StatusFound, "/")
+		return
+	}
+
+	c.HTML(http.StatusUnauthorized, "login.html", gin.H{
+		"Error": "Usuario o contraseña incorrectos",
+	})
+}
+
+func handleLogout(c *gin.Context) {
+	clearAuthSession(c)
+	c.Redirect(http.StatusFound, "/login")
+}
+
 func main() {
 
 	// Cargar variables de entorno desde .env
 	if err := godotenv.Load(); err != nil {
 		log.Println("No se encontró archivo .env, usando variables de entorno del sistema")
 	}
+
+	loadAuthConfig()
 
 	var err error
 
@@ -195,6 +351,25 @@ func main() {
 
 	router.LoadHTMLGlob("templates/*")
 	router.Static("/static", "./static")
+
+	// Configurar sesiones
+	store := cookie.NewStore([]byte(authSecret))
+	store.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7, // 7 días
+		HttpOnly: true,
+		Secure:   false, // cambiar a true si se usa HTTPS
+		SameSite: http.SameSiteLaxMode,
+	})
+	router.Use(sessions.Sessions("bolsa_gin_session", store))
+
+	// Rutas públicas de autenticación
+	router.GET("/login", handleLoginGet)
+	router.POST("/login", handleLoginPost)
+	router.GET("/logout", handleLogout)
+
+	// Middleware de autenticación para todas las demás rutas
+	router.Use(requireAuth())
 
 	// Ruta principal para mostrar los datos
 	router.GET("/", func(c *gin.Context) {
