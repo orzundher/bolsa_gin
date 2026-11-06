@@ -1,55 +1,61 @@
-# 🚀 Instrucciones Docker
+# 🚀 Despliegue con Docker
 
-## Construir la imagen Docker
+La aplicación se despliega con Docker Compose. La base de datos es PostgreSQL (Supabase), por lo que el contenedor no guarda datos y no necesita volúmenes.
 
-```bash
-docker build -t bolsa-gin:latest .
+## Requisitos
+
+- Docker y Docker Compose.
+- Un archivo `.env` junto a `docker-compose.yml` (no se versiona):
+
+```
+DATABASE_URL=postgresql://user:password@host:port/database
+AUTH_USER=admin
+AUTH_PASSWORD=change-me
+AUTH_SECRET=a-long-random-secret-for-cookie-signing
 ```
 
-## Ejecutar el contenedor
+- El **servicio de precios** (fuera de este repositorio) corriendo en el host en el puerto `3010`. El contenedor lo alcanza vía `PRECIOS_BASE_URL=http://host.docker.internal:3010` (definido en `docker-compose.yml`). Sin él fallan la actualización de precios y `/api/fetch-price/*`.
+
+## Desplegar / actualizar
+
+En el servidor, tras actualizar el código:
 
 ```bash
-docker run -d -p 8081:8081 --name bolsa-gin-app bolsa-gin:latest
+./build.sh
 ```
 
-La aplicación estará disponible en: **http://localhost:8081**
+Equivale a:
+
+```bash
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+```
+
+La aplicación queda publicada en el puerto **80** del host (80 → 8081 del contenedor). Con `restart: unless-stopped` se reinicia sola tras un reinicio del servidor.
 
 ## Comandos útiles
 
-### Ver logs del contenedor
 ```bash
-docker logs bolsa-gin-app
+docker compose logs -f bolsa_gin   # ver logs
+docker compose ps                  # estado
+docker compose restart bolsa_gin   # reiniciar
+docker compose down                # detener y eliminar el contenedor
 ```
 
-### Detener el contenedor
-```bash
-docker stop bolsa-gin-app
-```
-
-### Iniciar el contenedor detenido
-```bash
-docker start bolsa-gin-app
-```
-
-### Eliminar el contenedor
-```bash
-docker rm bolsa-gin-app
-```
-
-### Eliminar la imagen
-```bash
-docker rmi bolsa-gin:latest
-```
-
-## Persistencia de datos
-
-Si deseas persistir la base de datos SQLite entre reinicios del contenedor, puedes montar un volumen:
+## Ejecución sin Compose (pruebas)
 
 ```bash
-docker run -d -p 8081:8081 -v $(pwd)/data:/root --name bolsa-gin-app bolsa-gin:latest
+docker build -t bolsa-gin:latest .
+docker run -d -p 8081:8081 --env-file .env \
+  -e PRECIOS_BASE_URL=http://host.docker.internal:3010 \
+  --add-host host.docker.internal:host-gateway \
+  --name bolsa-gin-app bolsa-gin:latest
 ```
 
-En Windows PowerShell:
-```powershell
-docker run -d -p 8081:8081 -v ${PWD}/data:/root --name bolsa-gin-app bolsa-gin:latest
-```
+Disponible en **http://localhost:8081**.
+
+## Notas
+
+- Las migraciones de base de datos se ejecutan automáticamente al arrancar.
+- El `Dockerfile` es multi-stage (Go 1.25 sobre Alpine); el binario se compila con `CGO_ENABLED=0`.
