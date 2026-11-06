@@ -842,6 +842,76 @@ func main() {
 		c.String(http.StatusOK, b.String())
 	})
 
+	// Ruta para exportar todas las ventas (historial completo) a TOML
+	router.GET("/export-ventas-toml", func(c *gin.Context) {
+		var sales []Sale
+		if err := db.Preload("Ticker").Order("sale_date asc, id asc").Find(&sales).Error; err != nil {
+			c.String(http.StatusInternalServerError, "Error al obtener las ventas: %v", err)
+			return
+		}
+
+		// Utilidad/pérdida por venta (precio de venta vs WAC al momento de la venta)
+		_, _, saleViews, _, _, _, _, _, _, _, _, err := getInvestmentData()
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Error al obtener los datos: %v", err)
+			return
+		}
+		utilityByID := make(map[uint]SaleView, len(saleViews))
+		for _, v := range saleViews {
+			utilityByID[v.ID] = v
+		}
+
+		var totalAmount, totalCost, totalProfit, totalGains, totalLosses float64
+		for _, s := range sales {
+			totalAmount += s.Shares * s.SalePrice
+			totalCost += s.OperationCost
+			u := utilityByID[s.ID].SaleUtility
+			totalProfit += u
+			if u >= 0 {
+				totalGains += u
+			} else {
+				totalLosses += u
+			}
+		}
+
+		var b strings.Builder
+		b.WriteString("# Historial de Ventas\n")
+		b.WriteString(fmt.Sprintf("# Fecha de exportación: %s\n", time.Now().Local().Format("2006-01-02 15:04:05")))
+		b.WriteString("currency = \"EUR\"\n")
+		b.WriteString(fmt.Sprintf("total_sales = %d\n", len(sales)))
+		b.WriteString(fmt.Sprintf("total_amount = %.2f\n", totalAmount))
+		b.WriteString(fmt.Sprintf("total_operation_cost = %.2f\n", totalCost))
+		b.WriteString(fmt.Sprintf("total_profit_loss = %.2f\n", totalProfit))
+		b.WriteString(fmt.Sprintf("total_gains = %.2f\n", totalGains))
+		b.WriteString(fmt.Sprintf("total_losses = %.2f\n\n", totalLosses))
+
+		for _, s := range sales {
+			amount := s.Shares * s.SalePrice
+			sv := utilityByID[s.ID]
+			result := "gain"
+			if sv.SaleUtility < 0 {
+				result = "loss"
+			}
+			b.WriteString("[[sales]]\n")
+			b.WriteString(fmt.Sprintf("date = \"%s\"\n", s.SaleDate.Format("2006-01-02")))
+			b.WriteString(fmt.Sprintf("symbol = %q\n", s.Ticker.Name))
+			b.WriteString(fmt.Sprintf("shares = %.6f\n", s.Shares))
+			b.WriteString(fmt.Sprintf("price = %.4f\n", s.SalePrice))
+			b.WriteString(fmt.Sprintf("amount = %.2f\n", amount))
+			b.WriteString(fmt.Sprintf("operation_cost = %.2f\n", s.OperationCost))
+			b.WriteString(fmt.Sprintf("net_amount = %.2f\n", amount-s.OperationCost))
+			b.WriteString(fmt.Sprintf("wac_at_sale = %.4f\n", sv.WACAtSale))
+			b.WriteString(fmt.Sprintf("profit_loss = %.2f\n", sv.SaleUtility))
+			b.WriteString(fmt.Sprintf("performance = %.2f\n", sv.SalePerformance))
+			b.WriteString(fmt.Sprintf("result = \"%s\"\n\n", result))
+		}
+
+		filename := fmt.Sprintf("ventas_%s.toml", time.Now().Format("20060102"))
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+		c.Header("Content-Type", "application/toml")
+		c.String(http.StatusOK, b.String())
+	})
+
 	// Ruta para mostrar la página de compras
 	router.GET("/compras", func(c *gin.Context) {
 		investments, summaries, _, _, _, _, _, _, _, _, _, err := getInvestmentData()
