@@ -76,7 +76,7 @@ AUTH_SECRET=a-long-random-secret-for-cookie-signing
 - `AUTH_USER` / `AUTH_PASSWORD`: credenciales para iniciar sesión en la interfaz web y para autenticación Basic Auth en endpoints `/api/*`.
 - `AUTH_SECRET`: clave usada para firmar las cookies de sesión. Genera un valor aleatorio largo en producción.
 
-Database is Azure SQL Server (`gorm.io/driver/sqlserver`, pure Go, no C compiler needed). DSN is built from `DB_*` vars (or `DATABASE_URL` as `sqlserver://user:pass@host:1433?database=db` override).
+Database is Azure SQL Server (`gorm.io/driver/sqlserver`, pure Go, no C compiler needed). DSN is built from the `DB_*` vars.
 
 ## Database migrations
 
