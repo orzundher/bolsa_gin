@@ -28,7 +28,7 @@ import (
 // Migration trackea las migraciones ejecutadas
 type Migration struct {
 	ID        uint   `gorm:"primaryKey"`
-	Name      string `gorm:"uniqueIndex"`
+	Name      string `gorm:"uniqueIndex;size:255"`
 	AppliedAt time.Time
 }
 
@@ -2702,20 +2702,15 @@ func main() {
 	router.Run(":" + port)
 }
 
-// buildSQLServerDSN arma el DSN de Azure SQL Server. Si existe DATABASE_URL
-// (sqlserver://usuario:clave@host:1433?database=db) se usa tal cual; si no,
-// se construye con DB_SERVER, DB_PORT, DB_NAME, DB_USER y DB_PASSWORD.
+// buildSQLServerDSN arma el DSN de Azure SQL Server con DB_SERVER, DB_PORT,
+// DB_NAME, DB_USER y DB_PASSWORD.
 func buildSQLServerDSN() (string, error) {
-	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
-		return dsn, nil
-	}
-
 	server := os.Getenv("DB_SERVER")
 	name := os.Getenv("DB_NAME")
 	user := os.Getenv("DB_USER")
 	password := os.Getenv("DB_PASSWORD")
 	if server == "" || name == "" || user == "" || password == "" {
-		return "", fmt.Errorf("faltan variables de entorno: DB_SERVER, DB_NAME, DB_USER y DB_PASSWORD (o DATABASE_URL)")
+		return "", fmt.Errorf("faltan variables de entorno: DB_SERVER, DB_NAME, DB_USER y DB_PASSWORD")
 	}
 	port := os.Getenv("DB_PORT")
 	if port == "" {
@@ -2759,8 +2754,10 @@ func setupDatabase() (*gorm.DB, error) {
 
 // runMigrations ejecuta todas las migraciones pendientes en orden
 func runMigrations(database *gorm.DB) error {
-	// Crear tabla de migraciones si no existe
-	database.AutoMigrate(&Migration{})
+	// Crear tabla de migraciones solo si no existe (evita reintentar índices sobre columnas nvarchar(max) en SQL Server)
+	if !database.Migrator().HasTable(&Migration{}) {
+		database.AutoMigrate(&Migration{})
+	}
 
 	// Definir todas las migraciones disponibles
 	migrations := map[string]func(*gorm.DB) error{

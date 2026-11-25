@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"sort"
 	"time"
@@ -43,7 +44,12 @@ type PriceHistory struct {
 
 func main() {
 	godotenv.Load()
-	dsn := os.Getenv("DATABASE_URL")
+	dsn := (&url.URL{
+		Scheme:   "sqlserver",
+		User:     url.UserPassword(os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD")),
+		Host:     os.Getenv("DB_SERVER") + ":1433",
+		RawQuery: url.Values{"database": {os.Getenv("DB_NAME")}, "encrypt": {"true"}}.Encode(),
+	}).String()
 	db, _ := gorm.Open(sqlserver.Open(dsn), &gorm.Config{})
 
 	// 1. Current Utility
