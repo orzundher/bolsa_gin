@@ -10,7 +10,7 @@ RUN go mod download
 COPY . .
 
 # pgx es Go puro: no se necesita CGO
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o main .
+RUN CGO_ENABLED=0 GOGC=50 GOMEMLIMIT=500MiB go build -p 1 -ldflags="-s -w" -o main .
 
 # Runtime stage
 FROM alpine:latest
