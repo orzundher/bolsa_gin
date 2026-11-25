@@ -1,6 +1,6 @@
 # 🚀 Despliegue con Docker
 
-La aplicación se despliega con Docker Compose. La base de datos es PostgreSQL (Supabase), por lo que el contenedor no guarda datos y no necesita volúmenes.
+La aplicación se despliega con Docker Compose. La base de datos es Azure SQL Server, por lo que el contenedor no guarda datos y no necesita volúmenes.
 
 ## Requisitos
 
@@ -8,8 +8,11 @@ La aplicación se despliega con Docker Compose. La base de datos es PostgreSQL (
 - Un archivo `.env` junto a `docker-compose.yml` (no se versiona):
 
 ```
-DATABASE_URL=postgresql://user:password@host:port/database
-AUTH_USER=admin
+DB_SERVER=revilla-data.database.windows.net
+DB_PORT=1433
+DB_NAME=inversiones
+DB_USER=azuresql@revilla-data
+DB_PASSWORD=change-me=admin
 AUTH_PASSWORD=change-me
 AUTH_SECRET=a-long-random-secret-for-cookie-signing
 ```

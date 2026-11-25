@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -18,7 +19,7 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlserver"
 	"gorm.io/gorm"
 )
 
@@ -2701,33 +2702,49 @@ func main() {
 	router.Run(":" + port)
 }
 
+// buildSQLServerDSN arma el DSN de Azure SQL Server. Si existe DATABASE_URL
+// (sqlserver://usuario:clave@host:1433?database=db) se usa tal cual; si no,
+// se construye con DB_SERVER, DB_PORT, DB_NAME, DB_USER y DB_PASSWORD.
+func buildSQLServerDSN() (string, error) {
+	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
+		return dsn, nil
+	}
+
+	server := os.Getenv("DB_SERVER")
+	name := os.Getenv("DB_NAME")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	if server == "" || name == "" || user == "" || password == "" {
+		return "", fmt.Errorf("faltan variables de entorno: DB_SERVER, DB_NAME, DB_USER y DB_PASSWORD (o DATABASE_URL)")
+	}
+	port := os.Getenv("DB_PORT")
+	if port == "" {
+		port = "1433"
+	}
+
+	q := url.Values{}
+	q.Set("database", name)
+	q.Set("encrypt", "true")
+	q.Set("TrustServerCertificate", "false")
+	q.Set("hostNameInCertificate", "*.database.windows.net")
+	q.Set("connection timeout", "30")
+
+	u := url.URL{
+		Scheme:   "sqlserver",
+		User:     url.UserPassword(user, password),
+		Host:     server + ":" + port,
+		RawQuery: q.Encode(),
+	}
+	return u.String(), nil
+}
+
 func setupDatabase() (*gorm.DB, error) {
-	// Usar connection string directo de Supabase
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		return nil, fmt.Errorf("falta la variable de entorno DATABASE_URL")
+	dsn, err := buildSQLServerDSN()
+	if err != nil {
+		return nil, err
 	}
 
-	// Agregar parámetros necesarios
-	if !strings.Contains(dsn, "prepare") {
-		if strings.Contains(dsn, "?") {
-			dsn += "&prepare=false"
-		} else {
-			dsn += "?prepare=false"
-		}
-	}
-	if !strings.Contains(dsn, "TimeZone") {
-		if strings.Contains(dsn, "?") {
-			dsn += "&TimeZone=UTC"
-		} else {
-			dsn += "?TimeZone=UTC"
-		}
-	}
-
-	database, err := gorm.Open(postgres.New(postgres.Config{
-		DSN:                  dsn,
-		PreferSimpleProtocol: true, // Desactiva prepared statements
-	}), &gorm.Config{})
+	database, err := gorm.Open(sqlserver.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
