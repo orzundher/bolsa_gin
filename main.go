@@ -2804,7 +2804,14 @@ func runMigrations(database *gorm.DB) error {
 		}
 
 		// Registrar migración como aplicada
-		database.Create(&Migration{Name: name, AppliedAt: time.Now()})
+		// La tabla importada puede tener id sin IDENTITY; si falla el insert normal, se asigna el id explícitamente
+		if err := database.Create(&Migration{Name: name, AppliedAt: time.Now()}).Error; err != nil {
+			var maxID uint
+			database.Model(&Migration{}).Select("COALESCE(MAX(id), 0)").Scan(&maxID)
+			if err := database.Create(&Migration{ID: maxID + 1, Name: name, AppliedAt: time.Now()}).Error; err != nil {
+				log.Printf("Aviso: no se pudo registrar la migración %s: %v", name, err)
+			}
+		}
 		log.Printf("Migración completada: %s", name)
 	}
 
