@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlserver"
 	"gorm.io/gorm"
 )
 
@@ -44,7 +44,7 @@ type PriceHistory struct {
 func main() {
 	godotenv.Load()
 	dsn := os.Getenv("DATABASE_URL")
-	db, _ := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, _ := gorm.Open(sqlserver.Open(dsn), &gorm.Config{})
 
 	// 1. Current Utility
 	var tickers []Ticker

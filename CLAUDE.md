@@ -17,7 +17,7 @@ go mod download
 
 The server starts on `http://localhost:8080` by default (override with `PORT` env var).
 
-**Windows note:** Requires a C compiler (TDM-GCC or MinGW-w64) for the PostgreSQL driver.
+**Note:** The SQL Server driver is pure Go; no C compiler is required.
 
 ## Architecture
 
@@ -62,7 +62,11 @@ This service is **not** part of this repo. Routes `/api/fetch-price/:yahoo_ticke
 Requires a `.env` file (not committed):
 
 ```
-DATABASE_URL=postgresql://user:password@host:port/database
+DB_SERVER=revilla-data.database.windows.net
+DB_PORT=1433
+DB_NAME=inversiones
+DB_USER=azuresql@revilla-data
+DB_PASSWORD=change-me
 PORT=8080
 AUTH_USER=admin
 AUTH_PASSWORD=change-me
@@ -72,7 +76,7 @@ AUTH_SECRET=a-long-random-secret-for-cookie-signing
 - `AUTH_USER` / `AUTH_PASSWORD`: credenciales para iniciar sesión en la interfaz web y para autenticación Basic Auth en endpoints `/api/*`.
 - `AUTH_SECRET`: clave usada para firmar las cookies de sesión. Genera un valor aleatorio largo en producción.
 
-Database is PostgreSQL hosted on Supabase. Connection uses `prepare=false` and `PreferSimpleProtocol: true` for Supabase pooler compatibility.
+Database is Azure SQL Server (`gorm.io/driver/sqlserver`, pure Go, no C compiler needed). DSN is built from `DB_*` vars (or `DATABASE_URL` as `sqlserver://user:pass@host:1433?database=db` override).
 
 ## Database migrations
 
