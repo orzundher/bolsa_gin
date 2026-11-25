@@ -338,7 +338,7 @@ func main() {
 
 	// Cargar variables de entorno desde .env
 	if err := godotenv.Load(); err != nil {
-		log.Println("No se encontró archivo .env, usando variables de entorno del sistema")
+		log.Println("Usando variables de entorno del sistema (sin archivo .env local)")
 	}
 
 	loadAuthConfig()
