@@ -75,7 +75,7 @@ type Sale struct {
 // PriceHistory representa un snapshot histórico de precio de un ticker.
 type PriceHistory struct {
 	gorm.Model
-	SnapshotID string // UUID o timestamp para agrupar snapshots
+	SnapshotID string `gorm:"size:64;index"` // UUID o timestamp para agrupar snapshots
 	TickerID   uint
 	Ticker     Ticker `gorm:"foreignKey:TickerID"`
 	Price      float64
@@ -703,7 +703,7 @@ func main() {
 		}
 		var snapshots []SnapshotInfo
 		db.Model(&PriceHistory{}).
-			Select("DISTINCT snapshot_id, MIN(created_at) as created_at").
+			Select("snapshot_id, MIN(created_at) as created_at").
 			Group("snapshot_id").
 			Order("created_at DESC").
 			Limit(2).
@@ -1157,7 +1157,7 @@ func main() {
 		}
 		var snapshots []SnapshotInfo
 		db.Model(&PriceHistory{}).
-			Select("DISTINCT snapshot_id, MIN(created_at) as created_at").
+			Select("snapshot_id, MIN(created_at) as created_at").
 			Group("snapshot_id").
 			Order("created_at DESC").
 			Limit(2).
@@ -2774,6 +2774,7 @@ func runMigrations(database *gorm.DB) error {
 		"011_rename_usdeur_to_yahooeur":       migration011RenameUsdEurToYahooEur,
 		"012_fix_yahoo_eur_column":            migration012FixYahooEurColumn,
 		"013_create_dividends_table":          migration013CreateDividendsTable,
+		"014_convert_text_columns":            migration014ConvertTextColumns,
 	}
 
 	// Obtener migraciones ya aplicadas
@@ -3442,6 +3443,43 @@ func migration012FixYahooEurColumn(database *gorm.DB) error {
 		}
 	}
 
+	return nil
+}
+
+// migration014ConvertTextColumns convierte columnas legacy text/ntext (heredadas de la migración
+// desde Postgres) a nvarchar, ya que SQL Server no permite DISTINCT, GROUP BY, ORDER BY ni = sobre text.
+func migration014ConvertTextColumns(database *gorm.DB) error {
+	type col struct {
+		TableName  string
+		ColumnName string
+		DataType   string
+		IsNullable string
+	}
+	var cols []col
+	if err := database.Raw(`SELECT c.table_name, c.column_name, c.data_type, c.is_nullable
+		FROM information_schema.columns c
+		JOIN information_schema.tables t ON t.table_name = c.table_name AND t.table_schema = c.table_schema
+		WHERE t.table_type = 'BASE TABLE' AND c.data_type IN ('text', 'ntext')`).Scan(&cols).Error; err != nil {
+		return err
+	}
+	for _, c := range cols {
+		typ := "nvarchar(max)"
+		if c.TableName == "price_histories" && c.ColumnName == "snapshot_id" {
+			typ = "nvarchar(64)"
+		}
+		null := "NULL"
+		if c.IsNullable == "NO" {
+			null = "NOT NULL"
+		}
+		stmt := fmt.Sprintf("ALTER TABLE [%s] ALTER COLUMN [%s] %s %s", c.TableName, c.ColumnName, typ, null)
+		if err := database.Exec(stmt).Error; err != nil {
+			log.Printf("Aviso: no se pudo convertir %s.%s: %v", c.TableName, c.ColumnName, err)
+			continue
+		}
+		log.Printf("  Columna %s.%s convertida a %s", c.TableName, c.ColumnName, typ)
+	}
+	database.Exec(`IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_price_histories_snapshot_id')
+		CREATE INDEX idx_price_histories_snapshot_id ON price_histories(snapshot_id)`)
 	return nil
 }
 
